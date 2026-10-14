@@ -1,0 +1,2247 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Dashboard Status Relokasi - APJATEL</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="/js/config.js"></script>
+<script src="/js/api-shim.js"></script>
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  :root{
+    --bg:#0A0F1C; --panel:#111A2E; --panel2:#16213B; --border:#243250;
+    --text:#E7ECF5; --muted:#8B96AC; --accent:#2E7BE0; --accent-dim:#122A4D;
+    --brand-red:#E4342B;
+    --done:#34D399; --proses:#FBBF24; --belum:#F87171;
+    --op:#38BDF8; --ven:#A78BFA;
+    --track-bg:#1B2740; --seg-belum:#2A374F;
+    --chart-grid:#1B2740; --chart-tick:#8B96AC; --chart-label:#E7ECF5;
+    --label-bg:rgba(10,15,28,.55); --label-text:#F5F8FF; --label-border:rgba(255,255,255,.12);
+  }
+  html[data-theme="light"]{
+    --bg:#F3F5FA; --panel:#FFFFFF; --panel2:#F1F4F9; --border:#DFE4EE;
+    --text:#1A2233; --muted:#6B7690; --accent:#2E7BE0; --accent-dim:#DCEAFB;
+    --brand-red:#E4342B;
+    --done:#16A34A; --proses:#D97706; --belum:#DC2626;
+    --op:#0284C7; --ven:#7C3AED;
+    --track-bg:#E7EBF3; --seg-belum:#E1E6EF;
+    --chart-grid:#E7EBF3; --chart-tick:#6B7690; --chart-label:#1A2233;
+    --label-bg:rgba(255,255,255,.92); --label-text:#101828; --label-border:rgba(16,24,40,.15);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:'Inter',-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+    font-size:14px;
+  }
+  .wrap{ max-width:1360px; margin:0 auto; padding:20px 24px 48px; }
+  h1{ font-family:'Space Grotesk',Inter,sans-serif; font-weight:600; font-size:22px; margin:0 0 2px; letter-spacing:.2px;}
+  .sub{ color:var(--muted); font-size:13px; margin:0; }
+  .titlebar{ display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:20px; flex-wrap:wrap; }
+  .refresh-box{ display:flex; flex-direction:column; align-items:flex-end; gap:4px; }
+  .btn-accent{ background:var(--accent-dim); border-color:var(--accent); color:var(--accent); font-weight:600; }
+  .btn-accent:hover{ background:var(--accent); color:#FFFFFF; }
+  .btn-accent:disabled{ opacity:.6; cursor:default; background:var(--accent-dim); color:var(--accent); }
+  .refresh-ts{ font-size:11px; color:var(--muted); }
+
+  /* login screen */
+  .login-screen{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
+  .login-card{ width:min(380px,100%); background:var(--panel); border:1px solid var(--border);
+               border-radius:14px; padding:28px 26px; }
+  .login-card h1{ font-size:19px; margin-bottom:4px; }
+  .login-card .sub{ margin-bottom:22px; }
+  .login-field{ display:flex; flex-direction:column; gap:5px; margin-bottom:14px; }
+  .login-field label{ font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; }
+  .login-field input{ width:100%; padding:10px 12px; font-size:14px; }
+  .login-error{ font-size:12.5px; color:var(--belum); background:rgba(248,113,113,.1);
+                border:1px solid rgba(248,113,113,.3); border-radius:8px; padding:8px 10px; margin-bottom:14px; display:none; }
+  .btn-login{ width:100%; padding:10px; font-size:14px; margin-top:4px; }
+  .link-request{ display:block; text-align:center; margin-top:14px; font-size:12.5px; color:var(--muted);
+                 text-decoration:none; }
+  .link-request:hover{ color:var(--accent); text-decoration:underline; }
+  .link-wa{ color:#25D366; margin-top:8px; font-weight:600; }
+  .link-wa:hover{ color:#25D366; text-decoration:underline; }
+  .request-hint{ margin-top:8px; font-size:11.5px; color:var(--muted); text-align:center;
+                 background:var(--panel2); border:1px solid var(--border); border-radius:8px; padding:8px 10px; }
+  .user-badge{ font-size:12px; color:var(--muted); display:flex; align-items:center; gap:8px; }
+  .user-badge b{ color:var(--text); }
+  .btn-logout{ font-size:11px; padding:4px 10px; }
+
+  .logo-badge{ background:#fff; border-radius:10px; padding:7px 12px; display:inline-flex; align-items:center; }
+  .logo-badge img{ height:30px; display:block; }
+  .logo-fallback{ color:var(--accent); font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:16px; letter-spacing:.5px; }
+  .login-card .logo-badge{ margin-bottom:16px; }
+  .titlebar-brand{ display:flex; align-items:center; gap:14px; }
+  .card{ background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:16px 18px; }
+  .section-title{ font-family:'Space Grotesk',Inter,sans-serif; font-size:15px; font-weight:600; margin:28px 0 12px; display:flex; align-items:center; gap:8px;}
+  .section-title .dot{ width:8px; height:8px; border-radius:50%; background:var(--accent); box-shadow:0 0 8px var(--accent);}
+
+  /* filters */
+  .filters{ display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; }
+  .filters .field{ display:flex; flex-direction:column; gap:4px; min-width:150px; }
+  .filters label{ font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px;}
+  select, input[type=text], input[type=password]{
+    background:var(--panel2); border:1px solid var(--border); color:var(--text);
+    padding:8px 10px; border-radius:8px; font-size:13px; outline:none;
+  }
+  select:focus, input:focus{ border-color:var(--accent); }
+  .msel{ position:relative; }
+  .msel-btn{ width:100%; text-align:left; background:var(--panel2); border:1px solid var(--border); color:var(--text);
+             padding:8px 10px; border-radius:8px; font-size:13px; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .msel-btn:hover{ border-color:var(--accent); }
+  .msel-btn.active-filter{ border-color:var(--accent); color:var(--accent); font-weight:600; }
+  .msel-panel{ display:none; position:absolute; top:calc(100% + 4px); left:0; min-width:220px; max-height:260px;
+               overflow-y:auto; background:var(--panel); border:1px solid var(--border); border-radius:10px;
+               padding:6px; z-index:50; box-shadow:0 12px 30px rgba(0,0,0,.25); }
+  .msel-panel.open{ display:block; }
+  .msel-option{ display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:6px; cursor:pointer; font-size:13px; }
+  .msel-option:hover{ background:var(--panel2); }
+  .msel-option input{ margin:0; accent-color:var(--accent); }
+  .msel-actions{ display:flex; justify-content:space-between; gap:6px; padding:4px 6px 2px; border-top:1px solid var(--border); margin-top:4px; }
+  .msel-actions button{ background:none; border:none; color:var(--accent); font-size:11.5px; cursor:pointer; padding:2px 4px; }
+  .msel-actions button:hover{ text-decoration:underline; }
+  .btn{ background:var(--panel2); border:1px solid var(--border); color:var(--text); padding:8px 14px;
+        border-radius:8px; cursor:pointer; font-size:13px; }
+  .btn:hover{ border-color:var(--accent); color:var(--accent);}
+  .btn:disabled{ opacity:.4; cursor:default; border-color:var(--border); color:var(--muted); }
+
+  /* tab navigation */
+  .tabnav{ display:flex; gap:6px; margin-bottom:16px; border-bottom:1px solid var(--border); }
+  .tabnav-btn{ background:none; border:none; color:var(--muted); padding:10px 16px; font-size:13.5px;
+               font-weight:600; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; }
+  .tabnav-btn:hover{ color:var(--text); }
+  .tabnav-btn.active{ color:var(--accent); border-bottom-color:var(--accent); }
+
+  /* CRUD toolbar & table */
+  .crud-toolbar{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between; }
+  .crud-toolbar input[type=text]{ flex:1; min-width:220px; }
+  .crud-table{ width:100%; border-collapse:collapse; font-size:12.5px; }
+  .crud-table th{ text-align:left; color:var(--muted); text-transform:uppercase; letter-spacing:.4px;
+                  font-size:10.5px; padding:8px 10px; border-bottom:1px solid var(--border); white-space:nowrap; }
+  .crud-table td{ padding:8px 10px; border-bottom:1px solid var(--border); vertical-align:top; }
+  .crud-table tr:hover td{ background:var(--panel2); }
+  .crud-empty{ color:var(--muted); text-align:center; padding:22px !important; }
+  .crud-actions{ display:flex; gap:6px; white-space:nowrap; }
+  .crud-actions button{ font-size:11.5px; padding:4px 9px; }
+  .btn-danger{ border-color:var(--belum); color:var(--belum); }
+  .btn-danger:hover{ background:var(--belum); color:#fff; }
+  .mini-steps{ display:flex; flex-wrap:nowrap; gap:2px; margin-bottom:3px; }
+  .mini-steps:last-child{ margin-bottom:0; }
+  .mini-step{ width:12px; height:12px; border-radius:3px; font-size:0; flex:0 0 auto; }
+
+  /* form (modal input/edit) */
+  .form-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .form-grid .full{ grid-column:1 / -1; }
+  .form-field{ display:flex; flex-direction:column; gap:4px; }
+  .form-field label{ font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; }
+  .form-field input, .form-field select{ width:100%; }
+  .form-field.ff-auto input:disabled, .form-field.ff-auto select:disabled{
+    background:var(--track-bg); color:var(--muted); opacity:1; cursor:not-allowed;
+  }
+  .form-field.ff-highlight input, .form-field.ff-highlight select{
+    background:#FFFFFF; color:#1A2233; border-color:var(--accent); font-weight:600;
+  }
+  .form-field.ff-manual input, .form-field.ff-manual select{
+    background:#FDE9C8; color:#3A2A0F; border:1.5px solid #f59e0b; font-weight:600;
+  }
+  .form-field.ff-manual label{ color:#f59e0b; font-weight:700; }
+  .form-actions{ display:flex; justify-content:flex-end; gap:8px; margin-top:18px; }
+  .form-error{ font-size:12.5px; color:var(--belum); background:rgba(248,113,113,.1);
+               border:1px solid rgba(248,113,113,.3); border-radius:8px; padding:8px 10px; margin-bottom:12px; display:none; }
+  .steps-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:6px; }
+
+  /* KPI */
+  .kpis{ display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin-top:14px; }
+  .kpi{ background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:14px 16px;}
+  .kpi .lbl{ font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px;}
+  .kpi .val{ font-family:'Space Grotesk',Inter,sans-serif; font-size:26px; font-weight:600; }
+  .kpi .val.accent{ color:var(--accent); }
+  .kpi .val.warn{ color:var(--proses); }
+  .kpi .val.bad{ color:var(--belum); }
+  .kpi .val.good{ color:var(--done); }
+
+  /* pipeline */
+  .pipeline{ display:flex; flex-direction:column; gap:10px; }
+  .group-label{ font-size:11px; font-weight:600; color:var(--accent); text-transform:uppercase; letter-spacing:.6px;
+                margin:4px 0 2px; padding-top:6px; }
+  .group-label:first-child{ padding-top:0; }
+  .dur-badge{ font-size:9.5px; font-weight:600; padding:1px 6px; border-radius:10px; margin-left:6px; vertical-align:middle; white-space:nowrap; }
+  .dur-badge-parallel{ background:rgba(167,139,250,.18); color:#A78BFA; }
+  .dur-badge-seq{ background:rgba(139,150,172,.15); color:var(--muted); }
+  .dur-badge-start{ background:rgba(46,123,224,.18); color:var(--accent); }
+  .dur-badge-join{ background:rgba(228,52,43,.15); color:var(--brand-red); }
+  .dur-row-included{ background:rgba(46,123,224,.07); border-radius:8px; padding:4px 6px; margin:0 -6px; }
+  .dur-row-excluded{ opacity:.5; }
+  .dur-row-excluded .step-track .seg{ background:var(--muted) !important; box-shadow:none !important; }
+  .dur-incl{ font-size:9.5px; font-weight:600; padding:1px 6px; border-radius:10px; margin-left:6px; vertical-align:middle; white-space:nowrap; }
+  .dur-incl-yes{ background:rgba(52,211,153,.15); color:var(--done); }
+  .dur-incl-no{ background:rgba(139,150,172,.12); color:var(--muted); }
+  .step-row{ display:grid; grid-template-columns:150px 1fr 130px; align-items:center; gap:12px; }
+  .step-name{ font-size:12.5px; color:var(--text); }
+  .step-track{ position:relative; height:20px; border-radius:7px; overflow:hidden; background:var(--track-bg); display:flex; }
+  .seg{ height:100%; }
+  .seg.done{ background:var(--done); box-shadow:0 0 6px rgba(52,211,153,.5) inset; }
+  .seg.proses{ background:var(--proses); }
+  .seg.belum{ background:var(--seg-belum); }
+  .seg-labels{ position:absolute; inset:0; pointer-events:none; }
+  .seg-label{ position:absolute; top:50%; transform:translate(-50%,-50%);
+              font-family:'Space Grotesk',monospace; font-size:9.5px; font-weight:700; white-space:nowrap;
+              color:var(--label-text); background:var(--label-bg); border:1px solid var(--label-border);
+              padding:0 4px; border-radius:4px; line-height:15px; }
+  .step-pct{ font-family:'Space Grotesk',monospace; font-size:12px; color:var(--muted); text-align:right; }
+  .legend{ display:flex; gap:16px; margin-top:10px; font-size:12px; color:var(--muted); }
+  .legend span{ display:inline-flex; align-items:center; gap:6px; }
+  .legend i{ width:10px; height:10px; border-radius:3px; display:inline-block; }
+
+  /* two-column layout */
+  .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media (max-width:900px){ .grid2{ grid-template-columns:1fr; } }
+
+  table{ width:100%; border-collapse:collapse; font-size:12.5px; }
+  thead th{ text-align:left; color:var(--muted); font-weight:500; font-size:11px; text-transform:uppercase;
+             letter-spacing:.4px; padding:6px 8px; border-bottom:1px solid var(--border); position:sticky; top:0; background:var(--panel);}
+  tbody td{ padding:7px 8px; border-bottom:1px solid var(--track-bg); }
+  tbody tr:hover{ background:var(--panel2); cursor:pointer; }
+  .scrollbox{ max-height:340px; overflow-y:auto; margin-top:10px; border-top:1px solid var(--border); }
+  .bar-mini{ height:6px; border-radius:3px; background:var(--track-bg); overflow:hidden; margin-top:3px; }
+  .bar-mini i{ display:block; height:100%; background:var(--accent); }
+  .num{ font-family:'Space Grotesk',monospace; text-align:right; }
+  .badge{ font-size:11px; padding:2px 8px; border-radius:20px; white-space:nowrap; }
+  .badge.b-og{ background:rgba(251,191,36,.15); color:var(--proses); }
+  .badge.b-done{ background:rgba(52,211,153,.15); color:var(--done); }
+  .badge.b-bad{ background:rgba(248,113,113,.15); color:var(--belum); }
+  .badge.b-none{ background:rgba(139,150,172,.15); color:var(--muted); }
+
+  .grp-row{ cursor:pointer; }
+  .grp-detail td{ padding:0; border-bottom:1px solid var(--border); background:var(--panel2); }
+  .stage-detail{ display:grid; grid-template-columns:1fr 1fr; gap:0 24px; padding:12px 14px; }
+  @media (max-width:700px){ .stage-detail{ grid-template-columns:1fr; } }
+  .stage-detail-title{ font-size:11px; font-weight:600; color:var(--accent); text-transform:uppercase;
+                        letter-spacing:.5px; margin:6px 0 4px; }
+  .stage-chip{ display:grid; grid-template-columns:120px 1fr 190px; align-items:center; gap:8px; padding:3px 0; }
+  .stage-chip-name{ font-size:11.5px; color:var(--text); }
+  .stage-chip-track{ height:6px; border-radius:3px; background:#0F1626; overflow:hidden; }
+  .stage-chip-fill{ height:100%; background:var(--done); }
+  .stage-chip-nums{ font-size:10.5px; color:var(--muted); font-family:'Space Grotesk',monospace; text-align:right; }
+
+  .loc-list{ padding:0 14px 14px; }
+  .loc-scroll{ max-height:220px; overflow-y:auto; border:1px solid var(--border); border-radius:8px; margin-top:6px; }
+  .loc-item{ padding:8px 10px; border-bottom:1px solid var(--track-bg); }
+  .loc-item:last-child{ border-bottom:none; }
+  .loc-main{ font-size:12px; }
+  .loc-id{ font-family:'Space Grotesk',monospace; color:var(--accent); margin-right:8px; }
+  .loc-name{ color:var(--text); }
+  .loc-meta{ font-size:11px; color:var(--muted); margin-top:2px; }
+  .loc-open-row{ padding:2px 14px 14px; }
+
+  /* modal */
+  .modal-overlay{ position:fixed; inset:0; background:rgba(4,7,14,.72); z-index:1000;
+                   display:flex; align-items:center; justify-content:center; padding:24px; }
+  .modal-box{ background:var(--panel); border:1px solid var(--border); border-radius:14px;
+              width:min(1000px,94vw); max-height:88vh; display:flex; flex-direction:column; overflow:hidden;
+              box-shadow:0 20px 60px rgba(0,0,0,.5); }
+  .modal-header{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
+                 padding:18px 22px; border-bottom:1px solid var(--border); }
+  .modal-title{ font-family:'Space Grotesk',Inter,sans-serif; font-size:17px; font-weight:600; }
+  .modal-sub{ font-size:12px; color:var(--muted); margin-top:3px; }
+  .modal-body{ padding:18px 22px; overflow-y:auto; }
+  .modal-body table{ font-size:13px; }
+  .modal-body thead th{ position:sticky; top:0; }
+  .modal-body td{ vertical-align:top; }
+
+  canvas{ max-width:100%; }
+  .loading{ padding:60px 0; text-align:center; color:var(--muted); }
+  .empty{ padding:24px; text-align:center; color:var(--muted); }
+
+  .detail-pagination{ display:flex; align-items:center; justify-content:center; gap:16px; margin-top:12px; }
+  .detail-pic-line{ font-size:11px; color:var(--muted); white-space:nowrap; }
+  .detail-pic-line b{ color:var(--text); font-weight:500; }
+  .stage-dots{ display:flex; align-items:center; gap:3px; flex-wrap:nowrap; }
+  .stage-dot{ width:11px; height:11px; border-radius:3px; flex-shrink:0; cursor:default; }
+  .stage-dot.done{ background:var(--done); }
+  .stage-dot.proses{ background:var(--proses); }
+  .stage-dot.belum{ background:var(--seg-belum); }
+  .stage-dots-gap{ width:8px; }
+</style>
+</head>
+<body>
+
+<div class="login-screen" id="loginScreen">
+  <div class="login-card">
+    <div class="logo-badge">
+      <img src="https://apjatel.id/wp-content/uploads/2020/06/logo-web.png" alt="APJATEL"
+           onerror="this.parentElement.innerHTML='&lt;span class=&quot;logo-fallback&quot;&gt;APJATEL&lt;/span&gt;'">
+    </div>
+    <h1>Dashboard status relokasi</h1>
+    <p class="sub">Masuk untuk melihat data sesuai akun kamu</p>
+    <div class="login-error" id="loginError"></div>
+    <div class="login-field">
+      <label>Username</label>
+      <input type="text" id="loginUsername" autocomplete="username">
+    </div>
+    <div class="login-field">
+      <label>Password</label>
+      <input type="password" id="loginPassword" autocomplete="current-password">
+    </div>
+    <button class="btn btn-accent btn-login" id="btn-login">Masuk</button>
+    <a href="#" id="linkRequestAccess" class="link-request">Belum punya akses? Permintaan Akses (Email)</a>
+    <a href="#" id="linkRequestAccessWa" class="link-request link-wa">Kirim via WhatsApp</a>
+    <div class="request-hint" id="requestAccessHint" style="display:none;"></div>
+    <a href="#" id="btn-theme-toggle-login" class="link-request" style="margin-top:4px;">&#9789; Ganti ke tampilan terang</a>
+  </div>
+</div>
+
+<div id="dashboardScreen" style="display:none;">
+<div class="wrap">
+  <div class="titlebar">
+    <div class="titlebar-brand">
+      <div class="logo-badge">
+        <img src="https://apjatel.id/wp-content/uploads/2020/06/logo-web.png" alt="APJATEL"
+             onerror="this.parentElement.innerHTML='&lt;span class=&quot;logo-fallback&quot;&gt;APJATEL&lt;/span&gt;'">
+      </div>
+      <div>
+        <h1>Dashboard status relokasi</h1>
+        <p class="sub">Pantau progres 12 tahap relokasi, outstanding operator, outstanding vendor, dan outstanding per tahun</p>
+      </div>
+    </div>
+    <div class="refresh-box">
+      <div class="user-badge"><b id="userBadgeName"></b> <span id="userBadgeKategori"></span> &middot; <button class="btn btn-logout" id="btn-theme-toggle">&#9789; Light</button> &middot; <button class="btn btn-logout" id="btn-logout">Keluar</button></div>
+      <button class="btn btn-accent" id="btn-refresh">&#8635; Refresh data</button>
+      <div class="refresh-ts" id="refreshTs"></div>
+      <div class="refresh-ts" id="dataLastUpdate" title="Tanggal input terbaru di antara semua kolom tanggal tahapan, dari data yang sedang ditampilkan (ikut filter)"></div>
+    </div>
+  </div>
+
+  <div class="tabnav" id="tabnav" style="display:none;">
+    <button type="button" class="tabnav-btn active" data-tab="dashboard" id="tab-btn-dashboard">Dashboard</button>
+    <button type="button" class="tabnav-btn" data-tab="boq" id="tab-btn-boq">Input &amp; Update BOQ</button>
+    <button type="button" class="tabnav-btn" data-tab="status" id="tab-btn-status">Update Status Relokasi</button>
+    <button type="button" class="tabnav-btn" data-tab="relokasi" id="tab-btn-relokasi">Data Relokasi</button>
+    <button type="button" class="tabnav-btn" data-tab="peta" id="tab-btn-peta">Peta Relokasi</button>
+  </div>
+
+  <div id="tabpage-dashboard">
+  <div class="card filters" id="filters" style="display:none;">
+    <div class="field">
+      <label>Tahun</label>
+      <div class="msel" id="msel-tahun" data-filter-key="tahun">
+        <button type="button" class="msel-btn" id="msel-tahun-btn">Semua</button>
+        <div class="msel-panel" id="msel-tahun-panel"></div>
+      </div>
+    </div>
+    <div class="field">
+      <label>Wilayah</label>
+      <div class="msel" id="msel-wilayah" data-filter-key="wilayah">
+        <button type="button" class="msel-btn" id="msel-wilayah-btn">Semua</button>
+        <div class="msel-panel" id="msel-wilayah-panel"></div>
+      </div>
+    </div>
+    <div class="field">
+      <label>Status relokasi</label>
+      <div class="msel" id="msel-status" data-filter-key="status">
+        <button type="button" class="msel-btn" id="msel-status-btn">Semua</button>
+        <div class="msel-panel" id="msel-status-panel"></div>
+      </div>
+    </div>
+    <div class="field">
+      <label>Kategori tahapan</label>
+      <select id="f-kattahap"><option value="">Semua</option></select>
+    </div>
+    <div class="field">
+      <label>Tahapan</label>
+      <select id="f-tahapan"><option value="">Semua</option></select>
+    </div>
+    <div class="field">
+      <label>Status tahapan</label>
+      <select id="f-statustahap">
+        <option value="">Semua</option>
+        <option value="Done">Done</option>
+        <option value="Proses">Proses</option>
+        <option value="Belum">Belum</option>
+      </select>
+    </div>
+    <div class="field" style="flex:1;">
+      <label>Cari (ID project / lokasi / operator / vendor)</label>
+      <input type="text" id="f-search" placeholder="ketik untuk mencari...">
+    </div>
+    <button class="btn" id="btn-reset">Reset filter</button>
+    <button class="btn btn-accent" id="btn-export">&#8681; Export Excel</button>
+  </div>
+  <p class="sub" id="filterHint" style="margin-top:8px;"></p>
+
+  <div id="loading" class="loading">Memuat data dari sheet...</div>
+  <div id="content" style="display:none;">
+
+    <div class="kpis" id="kpis"></div>
+
+    <div class="section-title"><span class="dot"></span>Progres 12 tahap relokasi</div>
+    <div class="card">
+      <div class="pipeline" id="pipeline"></div>
+      <div class="legend">
+        <span><i style="background:var(--done)"></i>Done</span>
+        <span><i style="background:var(--proses)"></i>Proses</span>
+        <span><i style="background:var(--seg-belum)"></i>Belum</span>
+      </div>
+    </div>
+
+    <div class="section-title"><span class="dot" style="background:var(--ven);box-shadow:0 0 8px var(--ven)"></span>Monitoring update terakhir per mitra</div>
+    <div class="card">
+      <div class="kpis" style="margin-top:0;margin-bottom:16px;">
+        <div class="kpi"><div class="lbl">Mitra aktif update (&le;7 hari)</div><div class="val good" id="muGood">-</div></div>
+        <div class="kpi"><div class="lbl">Perlu diingatkan (8&ndash;30 hari)</div><div class="val warn" id="muWarn">-</div></div>
+        <div class="kpi"><div class="lbl">Sudah lama tidak update (&gt;30 hari)</div><div class="val bad" id="muBad">-</div></div>
+        <div class="kpi"><div class="lbl">Belum ada tanggal tercatat</div><div class="val" id="muNone">-</div></div>
+      </div>
+      <div class="scrollbox">
+        <table>
+          <thead><tr><th>Nama vendor</th><th class="num">Jumlah baris</th><th>Update terakhir</th><th class="num">Sudah berapa lama</th><th>Status</th></tr></thead>
+          <tbody id="tblVendorUpdate"></tbody>
+        </table>
+      </div>
+      <p class="sub" style="margin:10px 0 0;">Diurutkan dari yang PALING LAMA tidak update. Tanggalnya diambil dari input paling baru di antara semua kolom tanggal 12 tahapan untuk baris-baris vendor tersebut. Mengikuti filter yang aktif di atas.</p>
+    </div>
+
+    <div class="section-title"><span class="dot"></span>Rata-rata durasi per tahapan (hari)</div>
+    <div class="card">
+      <div class="kpis" style="margin-top:0;margin-bottom:16px;">
+        <div class="kpi"><div class="lbl">Total rata-rata durasi (semua tahap)</div><div class="val accent" id="durTotal">-</div></div>
+        <div class="kpi"><div class="lbl">Total rata-rata &mdash; Teknis</div><div class="val" id="durTotalTeknis">-</div></div>
+        <div class="kpi"><div class="lbl">Total rata-rata &mdash; Administrasi</div><div class="val" id="durTotalAdmin">-</div></div>
+      </div>
+      <div class="pipeline" id="pipelineDurasi"></div>
+      <p class="sub" style="margin:10px 0 0;">Dihitung hanya dari data durasi yang valid (maks 365 hari, nilai di luar itu diabaikan). BA Survey dihitung dari selisih tanggal Pembuatan Alur TERAWAL dan tanggal BA Survey TERAWAL per ruas lokasi relokasi. Total durasi mengikuti alur predecessor sebenarnya: setelah BA Survey ada 2 cabang yang berjalan BERSAMAAN &mdash; Pembuatan Alur (badge &#8646; Paralel) vs Permintaan Kabel&rarr;Pengiriman Kabel &mdash; yang keduanya BERTEMU di Penarikan Kabel (badge &#8904; Gabungan), karena penarikan kabel baru bisa dikerjakan setelah KEDUA cabang itu selesai. Sejak titik itu semuanya jadi satu rantai tunggal berurutan: Cut Over&rarr;Opname/QC&rarr;BOQ&rarr;PR-PO&rarr;BAST&rarr;Invoice&rarr;Payment. Tahap dengan badge hijau <b>"&#10003; Termasuk Total"</b> adalah yang benar-benar menyumbang ke angka Total di atas; tahap yang pudar dengan badge <b>"&#8943; Tidak masuk Total"</b> ada di cabang yang lebih pendek di titik gabungan sehingga tidak ikut dihitung.</p>
+    </div>
+
+    <div class="section-title"><span class="dot" style="background:var(--op);box-shadow:0 0 8px var(--op)"></span>Outstanding progress operator</div>
+    <div class="grid2">
+      <div class="card">
+        <div style="position:relative;height:320px;">
+          <canvas id="chartOperator" role="img" aria-label="Grafik batang jumlah outstanding per operator">Grafik outstanding per operator</canvas>
+        </div>
+      </div>
+      <div class="card">
+        <div class="scrollbox">
+        <table>
+          <thead><tr><th>Operator</th><th class="num">Outstanding</th><th class="num">Total</th><th class="num">% selesai</th><th>Tahapan tersendat</th></tr></thead>
+          <tbody id="tblOperator"></tbody>
+        </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-title"><span class="dot" style="background:var(--ven);box-shadow:0 0 8px var(--ven)"></span>Outstanding vendor</div>
+    <div class="grid2">
+      <div class="card">
+        <div style="position:relative;height:320px;">
+          <canvas id="chartVendor" role="img" aria-label="Grafik batang jumlah outstanding per vendor">Grafik outstanding per vendor</canvas>
+        </div>
+      </div>
+      <div class="card">
+        <div class="scrollbox">
+        <table>
+          <thead><tr><th>Vendor</th><th class="num">Outstanding</th><th class="num">Total</th><th class="num">% selesai</th><th>Tahapan tersendat</th></tr></thead>
+          <tbody id="tblVendor"></tbody>
+        </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-title"><span class="dot"></span>Outstanding per tahun</div>
+    <div class="grid2">
+      <div class="card">
+        <div style="position:relative;height:280px;">
+          <canvas id="chartYear" role="img" aria-label="Grafik batang outstanding per tahun">Grafik outstanding per tahun</canvas>
+        </div>
+      </div>
+      <div class="card">
+        <table>
+          <thead><tr><th>Tahun</th><th class="num">Outstanding</th><th class="num">Selesai</th><th class="num">Total</th></tr></thead>
+          <tbody id="tblYear"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section-title"><span class="dot"></span>Detail status relokasi</div>
+    <div class="card">
+      <div class="scrollbox" style="max-height:520px;">
+        <table>
+          <thead><tr>
+            <th>Lokasi relokasi</th>
+            <th>Nama vendor</th>
+            <th>Nama operator</th>
+            <th>Waktu relokasi</th>
+            <th>Status relokasi</th>
+            <th>PIC</th>
+            <th>Status 12 tahapan</th>
+          </tr></thead>
+          <tbody id="tblDetail"></tbody>
+        </table>
+      </div>
+      <div class="detail-pagination">
+        <button class="btn" id="detailPrev">&larr; Sebelumnya</button>
+        <span id="detailPageInfo" class="sub" style="margin:0;"></span>
+        <button class="btn" id="detailNext">Berikutnya &rarr;</button>
+      </div>
+      <div class="legend" style="margin-top:12px;">
+        <span><i style="background:var(--done)"></i>Done</span>
+        <span><i style="background:var(--proses)"></i>Proses</span>
+        <span><i style="background:var(--seg-belum)"></i>Belum</span>
+        <span style="color:var(--muted);">&middot; urutan: Teknis (7) &middot; Administrasi (5)</span>
+      </div>
+    </div>
+
+  </div>
+  </div><!-- /tabpage-dashboard -->
+
+  <div id="tabpage-boq" style="display:none;">
+    <div class="section-title"><span class="dot"></span>Data BOQ Relokasi</div>
+    <div class="card" style="margin-bottom:16px;">
+      <div class="crud-toolbar">
+        <input type="text" id="boq-search" placeholder="Cari ID Project / Lokasi / Vendor / Operator / ID Item...">
+        <button class="btn btn-accent" id="btn-boq-add">+ Tambah Item BOQ</button>
+      </div>
+      <p class="sub" id="boq-count" style="margin-top:8px;"></p>
+    </div>
+    <div class="card" style="overflow-x:auto;">
+      <table class="crud-table" id="boq-table">
+        <thead><tr>
+          <th>ID Project</th><th>Lokasi</th><th>Vendor</th><th>Operator</th>
+          <th>ID Item</th><th>Deskripsi</th><th>Qty</th><th>Satuan</th>
+          <th></th>
+        </tr></thead>
+        <tbody id="boq-tbody"></tbody>
+      </table>
+    </div>
+  </div><!-- /tabpage-boq -->
+
+  <div id="tabpage-status" style="display:none;">
+    <div class="section-title"><span class="dot" style="background:var(--ven);box-shadow:0 0 8px var(--ven)"></span>Update Status Relokasi (12 Tahapan)</div>
+    <div class="card" style="margin-bottom:16px;">
+      <div class="crud-toolbar">
+        <input type="text" id="status-search" placeholder="Cari ID Project / Lokasi / Vendor / Operator...">
+        <button class="btn btn-accent" id="btn-status-add">+ Tambah Project</button>
+      </div>
+      <p class="sub" id="status-count" style="margin-top:8px;"></p>
+    </div>
+    <div class="card" style="overflow-x:auto;">
+      <table class="crud-table" id="status-table">
+        <thead><tr>
+          <th>ID Project</th><th>Lokasi</th><th>Vendor</th><th>Operator</th>
+          <th>Progres 12 Tahap</th><th></th>
+        </tr></thead>
+        <tbody id="status-tbody"></tbody>
+      </table>
+    </div>
+  </div><!-- /tabpage-status -->
+
+  <div id="tabpage-relokasi" style="display:none;">
+    <div class="section-title"><span class="dot" style="background:var(--op);box-shadow:0 0 8px var(--op)"></span>Data Relokasi</div>
+    <p class="sub" style="margin:-6px 0 16px;" id="relokasi-scope-note">Seluruh master data dari sheet "Data Relokasi".</p>
+
+    <div class="card" style="margin-bottom:16px;">
+      <div class="crud-toolbar">
+        <input type="text" id="relokasi-search" placeholder="Cari ID Project / Lokasi / Vendor / Wilayah...">
+      </div>
+      <p class="sub" id="relokasi-count" style="margin-top:8px;"></p>
+    </div>
+    <div class="card" style="overflow-x:auto;">
+      <table class="crud-table" id="relokasi-table">
+        <thead><tr>
+          <th>ID Project</th><th>Lokasi</th><th>Vendor</th><th>Wilayah</th><th>Status</th>
+          <th>Jumlah Operator</th><th>Nama Operator</th>
+        </tr></thead>
+        <tbody id="relokasi-tbody"></tbody>
+      </table>
+    </div>
+  </div><!-- /tabpage-relokasi -->
+
+  <div id="tabpage-peta" style="display:none;">
+    <div class="section-title"><span class="dot" style="background:var(--accent);box-shadow:0 0 8px var(--accent)"></span>Peta Relokasi</div>
+    <p class="sub" id="relokasi-map-note" style="margin:-6px 0 12px;"></p>
+    <div class="card">
+      <div id="relokasi-map" style="height:520px;border-radius:8px;overflow:hidden;"></div>
+      <div id="relokasi-map-legend" style="display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;font-size:12px;"></div>
+    </div>
+  </div><!-- /tabpage-peta -->
+
+</div>
+</div>
+
+<div class="modal-overlay" id="crudModal" style="display:none;">
+  <div class="modal-box" style="max-width:640px;">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="crudModalTitle">Form</div>
+        <div class="modal-sub" id="crudModalSub"></div>
+      </div>
+      <button class="btn" id="crudModalClose">Tutup &times;</button>
+    </div>
+    <div class="modal-body" id="crudModalBody"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="locModal" style="display:none;">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="locModalTitle">Ruas lokasi relokasi</div>
+        <div class="modal-sub" id="locModalSub"></div>
+      </div>
+      <button class="btn" id="locModalClose">Tutup &times;</button>
+    </div>
+    <div class="modal-body" id="locModalBody"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  if (window.Chart && window.ChartDataLabels) { Chart.register(ChartDataLabels); }
+</script>
+<script>
+  // ---- Theme (dark/light) ----
+  function getSavedTheme(){
+    try { return localStorage.getItem('dashboardTheme'); } catch (e) { return null; }
+  }
+  function saveTheme(theme){
+    try { localStorage.setItem('dashboardTheme', theme); } catch (e) { /* sandbox mungkin blokir, abaikan */ }
+  }
+  function applyTheme(theme){
+    document.documentElement.setAttribute('data-theme', theme);
+    var isLight = theme === 'light';
+    var mainBtn = document.getElementById('btn-theme-toggle');
+    var loginBtn = document.getElementById('btn-theme-toggle-login');
+    if (mainBtn) mainBtn.innerHTML = isLight ? '&#9788; Dark' : '&#9789; Light';
+    if (loginBtn) loginBtn.innerHTML = isLight ? '&#9788; Ganti ke tampilan gelap' : '&#9789; Ganti ke tampilan terang';
+    saveTheme(theme);
+  }
+  function toggleTheme(){
+    var current = document.documentElement.getAttribute('data-theme') || 'dark';
+    var next = current === 'light' ? 'dark' : 'light';
+    applyTheme(next);
+    // canvas chart tidak otomatis ikut warna CSS baru -> render ulang biar warnanya sinkron
+    if (typeof CURRENT_ROWS !== 'undefined' && CURRENT_ROWS && CURRENT_ROWS.length) render();
+  }
+  applyTheme(getSavedTheme() || 'dark');
+  (function(){
+    var b1 = document.getElementById('btn-theme-toggle');
+    var b2 = document.getElementById('btn-theme-toggle-login');
+    if (b1) b1.addEventListener('click', toggleTheme);
+    if (b2) b2.addEventListener('click', function(e){ e.preventDefault(); toggleTheme(); });
+  })();
+</script>
+<script>
+  var STEP_GROUPS = [
+    { title:'Teknis', steps:['BA Survey','Pembuatan Alur','Permintaan Kabel','Pengiriman Kabel','Penarikan Kabel','Cut Over','Opname/QC'] },
+    { title:'Administrasi', steps:['BOQ','PR-PO','BAST','Invoice','Payment'] }
+  ];
+  var STEPS = STEP_GROUPS.reduce(function(a,g){ return a.concat(g.steps); }, []);
+  var RAW = [];
+  var charts = {};
+  var CURRENT_USER = null;
+
+  function showLoginError(msg){
+    var el = document.getElementById('loginError');
+    el.textContent = msg;
+    el.style.display = 'block';
+  }
+
+  function doLogin(){
+    var username = document.getElementById('loginUsername').value.trim();
+    var password = document.getElementById('loginPassword').value;
+    var btn = document.getElementById('btn-login');
+    document.getElementById('loginError').style.display = 'none';
+    if (!username || !password){
+      showLoginError('Username dan password wajib diisi.');
+      return;
+    }
+    btn.disabled = true;
+    btn.textContent = 'Memeriksa...';
+    google.script.run.withSuccessHandler(function(res){
+      btn.disabled = false;
+      btn.textContent = 'Masuk';
+      if (!res || !res.success){
+        showLoginError((res && res.message) || 'Username atau password salah.');
+        return;
+      }
+      CURRENT_USER = { kategori: res.kategori, nama: res.nama, namaList: res.namaList, username: res.username };
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('dashboardScreen').style.display = 'block';
+      var badgeName = res.kategori === 'Admin' ? res.username : res.nama;
+      if (res.kategori !== 'Admin' && res.namaList && res.namaList.length > 1){
+        badgeName = res.namaList[0] + ' +' + (res.namaList.length - 1) + ' lainnya';
+      }
+      document.getElementById('userBadgeName').textContent = badgeName;
+      document.getElementById('userBadgeKategori').textContent = '(' + res.kategori + ')';
+      document.getElementById('tabnav').style.display = 'flex';
+      if (CURRENT_USER.kategori !== 'Admin') {
+        document.getElementById('btn-status-add').textContent = '+ Tambah Project (nama saya)';
+      }
+      loadData();
+    }).withFailureHandler(function(err){
+      btn.disabled = false;
+      btn.textContent = 'Masuk';
+      showLoginError((err && err.message) ? err.message : String(err));
+    }).login(username, password);
+  }
+
+  document.getElementById('btn-login').addEventListener('click', doLogin);
+
+  (function setupRequestAccessLink(){
+    var to = 'dian.sahril@apjatel.id';
+    var subject = 'Permintaan Akses Dashboard Status Relokasi';
+    var body =
+      'Nama :\n' +
+      'Nomor Telpon:\n' +
+      'Jabatan:\n' +
+      'Kategory: Operator/Mitra\n' +
+      'Nama Operator/Mitra:';
+    var mailto = 'mailto:' + to +
+      '?subject=' + encodeURIComponent(subject) +
+      '&body=' + encodeURIComponent(body);
+    var link = document.getElementById('linkRequestAccess');
+    link.setAttribute('href', mailto);
+    link.addEventListener('click', function(e){
+      e.preventDefault();
+      // Apps Script HtmlService menjalankan halaman di dalam iframe sandbox,
+      // yang sering memblokir navigasi mailto: lewat klik link biasa.
+      // window.top.location tembus sandbox tersebut pada sebagian besar kasus.
+      try {
+        window.top.location.href = mailto;
+      } catch (err) {
+        window.open(mailto, '_top');
+      }
+      // Jaga-jaga kalau perangkat tidak punya aplikasi email default terpasang
+      // (mailto: akan diam saja tanpa error) -> salin template ke clipboard
+      // supaya tetap bisa dikirim manual.
+      var manualText = 'To: ' + to + '\nSubject: ' + subject + '\n\n' + body;
+      if (navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(manualText).catch(function(){});
+      }
+      var hint = document.getElementById('requestAccessHint');
+      hint.textContent = 'Kalau aplikasi email tidak otomatis terbuka, template sudah disalin — kirim manual ke ' + to;
+      hint.style.display = 'block';
+    });
+  })();
+
+  (function setupRequestAccessWhatsApp(){
+    // GANTI nomor ini kalau permintaan akses harus ke nomor lain (mis. nomor pribadi PIC).
+    // Format: kode negara tanpa "+" atau "0" di depan, contoh nomor Indonesia 0812-xxxx-xxxx -> "62812xxxxxxx"
+    var WA_PHONE = '6285781126950'; // nomor WhatsApp tujuan permintaan akses
+
+    var message =
+      'Permintaan Akses Dashboard Status Relokasi\n\n' +
+      'Nama :\n' +
+      'Nomor Telpon:\n' +
+      'Jabatan:\n' +
+      'Kategory: Operator/Mitra\n' +
+      'Nama Operator/Mitra:';
+
+    var waLink = 'https://wa.me/' + WA_PHONE + '?text=' + encodeURIComponent(message);
+    var link = document.getElementById('linkRequestAccessWa');
+    link.setAttribute('href', waLink);
+    link.addEventListener('click', function(e){
+      e.preventDefault();
+      try {
+        window.top.location.href = waLink;
+      } catch (err) {
+        window.open(waLink, '_top');
+      }
+    });
+  })();
+  document.getElementById('loginPassword').addEventListener('keydown', function(e){
+    if (e.key === 'Enter') doLogin();
+  });
+  document.getElementById('loginUsername').addEventListener('keydown', function(e){
+    if (e.key === 'Enter') doLogin();
+  });
+
+  document.getElementById('btn-logout').addEventListener('click', function(){
+    if (window.APP_API) window.APP_API.clearSession();
+    CURRENT_USER = null;
+    RAW = [];
+    document.getElementById('dashboardScreen').style.display = 'none';
+    document.getElementById('loginScreen').style.display = 'flex';
+    document.getElementById('loginPassword').value = '';
+    document.getElementById('loginError').style.display = 'none';
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('loading').textContent = 'Memuat data dari sheet...';
+    document.getElementById('filters').style.display = 'none';
+    document.getElementById('content').style.display = 'none';
+  });
+
+  function loadData(){
+    google.script.run.withSuccessHandler(onDataLoaded).withFailureHandler(onDataError).getDashboardData(CURRENT_USER);
+  }
+
+  function onDataError(err){
+    var msg = (err && err.message) ? err.message : String(err);
+    document.getElementById('loading').innerHTML =
+      '<div class="empty">Gagal memuat data.<br><br>' + escapeHtml(msg) + '</div>';
+  }
+
+  function onDataLoaded(rows){
+    RAW = rows || [];
+    if (RAW.length === 0){
+      document.getElementById('loading').innerHTML = '<div class="empty">Tidak ada data ditemukan untuk akun ini.</div>';
+      return;
+    }
+    buildFilters();
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('filters').style.display = 'flex';
+    document.getElementById('content').style.display = 'block';
+    render();
+    setTimestamp();
+
+    document.getElementById('f-statustahap').addEventListener('change', render);
+    document.getElementById('f-kattahap').addEventListener('change', function(){
+      populateTahapanOptions();
+      render();
+    });
+    document.getElementById('f-tahapan').addEventListener('change', render);
+    document.getElementById('f-search').addEventListener('input', render);
+    document.getElementById('btn-reset').addEventListener('click', function(){
+      ['tahun','wilayah','status'].forEach(function(key){
+        FILTER_STATE[key] = [];
+        document.querySelectorAll('#msel-'+key+'-panel input[type=checkbox]').forEach(function(cb){ cb.checked = false; });
+        updateMultiSelectLabel(key);
+      });
+      document.getElementById('f-kattahap').value = '';
+      populateTahapanOptions();
+      document.getElementById('f-tahapan').value = '';
+      document.getElementById('f-statustahap').value = '';
+      document.getElementById('f-search').value = '';
+      render();
+    });
+
+    document.getElementById('btn-export').addEventListener('click', exportExcel);
+  }
+
+  function exportExcel(){
+    var rows = CURRENT_ROWS || [];
+    if (!rows.length){
+      alert('Tidak ada data untuk diekspor (cek filter yang aktif).');
+      return;
+    }
+
+    var stepCols = STEPS; // urutan Teknis lalu Administrasi
+    var picCols = ['PIC Mitra - Teknis','PIC Mitra - Administrasi','PIC Operator - Teknis','PIC Operator - Administrasi'];
+    var durationSteps = STEP_GROUPS.reduce(function(a,g){ return a.concat(g.steps); }, []);
+
+    var data = rows.map(function(r){
+      var obj = {
+        'ID Project APJATEL': r['ID Project APJATEL'] || '',
+        'Kategori Program': r['Kategori Program'] || '',
+        'Lokasi Relokasi': r['Lokasi Relokasi'] || '',
+        'Nama Instansi': r['Nama Instansi'] || '',
+        'Wilayah': r['Wilayah'] || '',
+        'Waktu Relokasi': r['Waktu Relokasi'] || '',
+        'Nama Vendor': r['Nama Vendor'] || '',
+        'Nama Operator': r['Nama Operator'] || '',
+        'Status Relokasi': r['Status Relokasi'] || '',
+        '% Progress': r['% Progress'] || 0,
+        'Statuss All Progress': r['Statuss All Progress'] || ''
+      };
+      stepCols.forEach(function(s){ obj['Tahap: '+s] = r[s] || 'Belum'; });
+      picCols.forEach(function(c){ obj[c] = r[c] || ''; });
+      durationSteps.forEach(function(s){
+        var v = r['Durasi_'+s];
+        obj['Durasi '+s+' (hari)'] = (v === null || v === undefined) ? '' : v;
+      });
+      return obj;
+    });
+
+    var ws = XLSX.utils.json_to_sheet(data);
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Status Relokasi');
+
+    var now = new Date();
+    var pad = function(n){ return String(n).padStart(2,'0'); };
+    var stamp = now.getFullYear()+''+pad(now.getMonth()+1)+pad(now.getDate())+'-'+pad(now.getHours())+pad(now.getMinutes());
+    XLSX.writeFile(wb, 'Status_Relokasi_' + stamp + '.xlsx');
+  }
+
+  function populateTahapanOptions(){
+    var kat = document.getElementById('f-kattahap').value;
+    var sel = document.getElementById('f-tahapan');
+    var current = sel.value;
+    sel.innerHTML = '<option value="">Semua</option>';
+    var steps = kat ? (STEP_GROUPS.filter(function(g){return g.title===kat;})[0] || {steps:[]}).steps : STEPS;
+    steps.forEach(function(s){
+      var opt = document.createElement('option');
+      opt.value = s; opt.textContent = s;
+      sel.appendChild(opt);
+    });
+    if (steps.indexOf(current) !== -1) sel.value = current;
+  }
+
+  var FILTER_STATE = { tahun: [], wilayah: [], status: [] }; // array kosong = "Semua" (tidak difilter)
+
+  function buildMultiSelect(key, values, labelFn){
+    labelFn = labelFn || function(v){ return String(v); };
+    var panel = document.getElementById('msel-'+key+'-panel');
+    var btn = document.getElementById('msel-'+key+'-btn');
+
+    var html = '';
+    values.forEach(function(v){
+      var vid = 'msel-'+key+'-opt-'+String(v).replace(/[^a-zA-Z0-9]/g,'_');
+      html += '<label class="msel-option" for="'+vid+'">' +
+        '<input type="checkbox" id="'+vid+'" value="'+escapeHtml(String(v))+'"> ' + escapeHtml(labelFn(v)) +
+      '</label>';
+    });
+    html += '<div class="msel-actions">' +
+      '<button type="button" data-act="all">Pilih semua</button>' +
+      '<button type="button" data-act="none">Kosongkan</button>' +
+    '</div>';
+    panel.innerHTML = html;
+
+    panel.querySelectorAll('input[type=checkbox]').forEach(function(cb){
+      cb.addEventListener('change', function(){
+        var vals = Array.prototype.slice.call(panel.querySelectorAll('input[type=checkbox]:checked')).map(function(c){ return c.value; });
+        FILTER_STATE[key] = vals;
+        updateMultiSelectLabel(key, values.length, labelFn);
+        render();
+      });
+    });
+    panel.querySelector('[data-act="all"]').addEventListener('click', function(){
+      panel.querySelectorAll('input[type=checkbox]').forEach(function(cb){ cb.checked = true; });
+      FILTER_STATE[key] = values.map(function(v){ return String(v); });
+      updateMultiSelectLabel(key, values.length, labelFn);
+      render();
+    });
+    panel.querySelector('[data-act="none"]').addEventListener('click', function(){
+      panel.querySelectorAll('input[type=checkbox]').forEach(function(cb){ cb.checked = false; });
+      FILTER_STATE[key] = [];
+      updateMultiSelectLabel(key, values.length, labelFn);
+      render();
+    });
+
+    btn.onclick = function(e){
+      e.stopPropagation();
+      document.querySelectorAll('.msel-panel.open').forEach(function(p){ if (p !== panel) p.classList.remove('open'); });
+      panel.classList.toggle('open');
+    };
+
+    updateMultiSelectLabel(key, values.length, labelFn);
+  }
+
+  function updateMultiSelectLabel(key, totalCount, labelFn){
+    var btn = document.getElementById('msel-'+key+'-btn');
+    var selected = FILTER_STATE[key];
+    if (!selected.length){
+      btn.textContent = 'Semua';
+      btn.classList.remove('active-filter');
+    } else if (selected.length === 1){
+      btn.textContent = labelFn ? labelFn(selected[0]) : selected[0];
+      btn.classList.add('active-filter');
+    } else {
+      btn.textContent = selected.length + ' dipilih';
+      btn.classList.add('active-filter');
+    }
+  }
+
+  document.addEventListener('click', function(e){
+    if (!e.target.closest('.msel')) {
+      document.querySelectorAll('.msel-panel.open').forEach(function(p){ p.classList.remove('open'); });
+    }
+  });
+
+  function uniqueSorted(arr){
+    return Array.from(new Set(arr.filter(function(v){ return v !== null && v !== undefined && v !== ''; })))
+      .sort(function(a,b){ return String(a).localeCompare(String(b)); });
+  }
+
+  function fillSelect(id, values){
+    var sel = document.getElementById(id);
+    values.forEach(function(v){
+      var opt = document.createElement('option');
+      opt.value = v; opt.textContent = v;
+      sel.appendChild(opt);
+    });
+  }
+
+  function buildFilters(){
+    var tahunValues = uniqueSorted(RAW.map(function(r){ return r['Waktu Relokasi']; })).sort(function(a,b){return a-b;});
+    var wilayahValues = uniqueSorted(RAW.map(function(r){ return r['Wilayah']; }));
+    var statusValues = uniqueSorted(RAW.map(function(r){ return r['Status Relokasi']; }));
+
+    buildMultiSelect('tahun', tahunValues);
+    buildMultiSelect('wilayah', wilayahValues);
+    buildMultiSelect('status', statusValues);
+
+    fillSelect('f-kattahap', STEP_GROUPS.map(function(g){ return g.title; }));
+    populateTahapanOptions();
+  }
+
+  function getFiltered(){
+    var tahunSel = FILTER_STATE.tahun;
+    var wilayahSel = FILTER_STATE.wilayah;
+    var statusSel = FILTER_STATE.status;
+    var tahapan = document.getElementById('f-tahapan').value;
+    var statusTahap = document.getElementById('f-statustahap').value;
+    var q = document.getElementById('f-search').value.trim().toLowerCase();
+
+    var hint = document.getElementById('filterHint');
+    if (tahapan && statusTahap){
+      hint.textContent = 'Menampilkan data dengan tahapan "'+tahapan+'" berstatus "'+statusTahap+'"';
+    } else if (tahapan || statusTahap){
+      hint.textContent = 'Pilih tahapan dan status tahapan sekaligus agar filter tahapan aktif';
+    } else {
+      hint.textContent = '';
+    }
+
+    return RAW.filter(function(r){
+      if (tahunSel.length && tahunSel.indexOf(String(r['Waktu Relokasi'])) === -1) return false;
+      if (wilayahSel.length && wilayahSel.indexOf(String(r['Wilayah'])) === -1) return false;
+      if (statusSel.length && statusSel.indexOf(String(r['Status Relokasi'])) === -1) return false;
+      if (tahapan && statusTahap && r[tahapan] !== statusTahap) return false;
+      if (q){
+        var hay = (r['ID Project APJATEL']+' '+r['Lokasi Relokasi']+' '+r['Nama Operator']+' '+r['Nama Vendor']).toLowerCase();
+        if (hay.indexOf(q) === -1) return false;
+      }
+      return true;
+    });
+  }
+
+  var CURRENT_ROWS = [];
+
+  var DETAIL_PAGE_SIZE = 50;
+  var detailPage = 1;
+
+  function render(){
+    var rows = getFiltered();
+    CURRENT_ROWS = rows;
+    renderKPIs(rows);
+    renderPipeline(rows);
+    renderDuration(rows);
+    renderGroup(rows, 'Nama Operator', 'chartOperator', 'tblOperator', themeVar('--op'));
+    renderGroup(rows, 'Nama Vendor', 'chartVendor', 'tblVendor', themeVar('--ven'));
+    renderVendorLastUpdate(rows);
+    renderYear(rows);
+    detailPage = 1;
+    renderDetail(rows);
+  }
+
+  var DURATION_STEPS = STEP_GROUPS.reduce(function(a,g){ return a.concat(g.steps); }, []);
+
+  // Peta predecessor sesuai tabel No/Nama Pekerjaan/Predecessor terbaru:
+  // 1 BA Survey (-), 2 Pembuatan Alur (1), 3 Permintaan Kabel (1), 4 Pengiriman Kabel (3),
+  // 5 Penarikan Kabel (4), 6 Cut Over (5), 7 Opname/QC (6), 8 BOQ (7 = Opname/QC!),
+  // 9 PR-PO (8), 10 BAST (9), 11 Invoice (10), 12 Payment (11).
+  // Jadi setelah BA Survey cuma ada 2 CABANG PARALEL: Pembuatan Alur (berdiri sendiri)
+  // dan rantai kabel (Permintaan Kabel -> ... -> Opname/QC). Rantai administrasi
+  // (BOQ -> ... -> Payment) BUKAN paralel lagi — dia lanjutan SETELAH Opname/QC selesai,
+  // jadi sepenuhnya berurutan mengikuti rantai kabel.
+  // Peta predecessor sesuai tabel No/Nama Pekerjaan/Predecessor (update terbaru):
+  // 1 BA Survey (-), 2 Pembuatan Alur (1), 3 Permintaan Kabel (1), 4 Pengiriman Kabel (3),
+  // 5 Penarikan Kabel (2 DAN 4 — titik GABUNGAN/join), 6 Cut Over (5), 7 Opname/QC (6),
+  // 8 BOQ (7), 9 PR-PO (8), 10 BAST (9), 11 Invoice (10), 12 Payment (11).
+  // Setelah BA Survey ada 2 CABANG PARALEL: Pembuatan Alur (berdiri sendiri) vs
+  // Permintaan Kabel -> Pengiriman Kabel. Keduanya BERTEMU di Penarikan Kabel, yang baru
+  // bisa mulai setelah KEDUA cabang itu selesai (bukan cuma salah satunya) — jadi nilai
+  // Penarikan Kabel dihitung dari cabang yang PALING LAMA di antara keduanya. Setelah itu
+  // semuanya jadi satu rantai tunggal berurutan sampai Payment (termasuk administrasi).
+  var PREDECESSOR = {
+    'BA Survey': null,
+    'Pembuatan Alur': 'BA Survey',
+    'Permintaan Kabel': 'BA Survey',
+    'Pengiriman Kabel': 'Permintaan Kabel',
+    'Penarikan Kabel': ['Pembuatan Alur', 'Pengiriman Kabel'],
+    'Cut Over': 'Penarikan Kabel',
+    'Opname/QC': 'Cut Over',
+    'BOQ': 'Opname/QC',
+    'PR-PO': 'BOQ',
+    'BAST': 'PR-PO',
+    'Invoice': 'BAST',
+    'Payment': 'Invoice'
+  };
+  // Titik cabang: tahap yang predecessor-nya BA Survey DAN ada lebih dari satu tahap
+  // seperti itu -> berjalan paralel satu sama lain.
+  var PARALLEL_STEPS = ['Pembuatan Alur', 'Permintaan Kabel'];
+  // Titik gabungan (join): tahap yang menunggu LEBIH DARI SATU predecessor sekaligus.
+  var JOIN_STEPS = ['Penarikan Kabel'];
+  var STEP_ORDER = ['BA Survey','Pembuatan Alur','Permintaan Kabel','Pengiriman Kabel','Penarikan Kabel',
+                     'Cut Over','Opname/QC','BOQ','PR-PO','BAST','Invoice','Payment'];
+
+  function computeEarliestFinish(avgByStep){
+    var ef = {};
+    STEP_ORDER.forEach(function(step){
+      var dur = avgByStep[step] || 0; // tahap tanpa data dianggap 0 (tidak memutus rantai)
+      var pred = PREDECESSOR[step];
+      var predEf = 0;
+      if (Array.isArray(pred)){
+        predEf = Math.max.apply(null, pred.map(function(p){ return ef[p] || 0; }));
+      } else if (pred){
+        predEf = ef[pred] || 0;
+      }
+      ef[step] = dur + predEf;
+    });
+    return ef;
+  }
+
+  function durRowHtml(step, value, maxValue, included, totalLabel){
+    var pct = maxValue > 0 ? Math.min(100, (value / maxValue) * 100) : 0;
+    var badge = badgeForStep(step);
+    var inclBadge = included
+      ? '<span class="dur-incl dur-incl-yes" title="Ikut dijumlah ke '+totalLabel+'">&#10003; Termasuk '+totalLabel+'</span>'
+      : '<span class="dur-incl dur-incl-no" title="Cabang ini lebih pendek, tidak ikut dijumlah ke '+totalLabel+'">&#8943; Tidak masuk '+totalLabel+'</span>';
+    var rowCls = 'step-row' + (included ? ' dur-row-included' : ' dur-row-excluded');
+    return '<div class="'+rowCls+'">' +
+      '<div class="step-name">'+step+' '+badge+' '+inclBadge+'</div>' +
+      '<div class="step-track" style="background:var(--track-bg);">' +
+        '<div class="seg" style="width:'+pct+'%;background:var(--accent);box-shadow:0 0 6px rgba(46,123,224,.45) inset;" title="'+value+' hari"></div>' +
+      '</div>' +
+      '<div class="step-pct">'+value+' hari</div>' +
+    '</div>';
+  }
+
+  function badgeForStep(step){
+    if (step === 'BA Survey'){
+      return '<span class="dur-badge dur-badge-start" title="Titik awal seluruh tahapan">&#9679; Awal</span>';
+    }
+    if (JOIN_STEPS.indexOf(step) !== -1){
+      return '<span class="dur-badge dur-badge-join" title="Titik gabungan — baru mulai setelah KEDUA cabang paralel selesai">&#8904; Gabungan</span>';
+    }
+    if (PARALLEL_STEPS.indexOf(step) !== -1){
+      return '<span class="dur-badge dur-badge-parallel" title="Cabang paralel, mulai langsung setelah BA Survey">&#8646; Paralel</span>';
+    }
+    return '<span class="dur-badge dur-badge-seq" title="Berurutan, menunggu tahap sebelumnya">&#8594; Berurutan</span>';
+  }
+
+  function durRowEmptyHtml(step){
+    var badge = badgeForStep(step);
+    return '<div class="step-row dur-row-excluded">' +
+      '<div class="step-name">'+step+' '+badge+'</div>' +
+      '<div class="step-track"><div class="seg belum" style="width:100%"></div></div>' +
+      '<div class="step-pct" style="color:var(--muted);">tidak ada data</div>' +
+    '</div>';
+  }
+
+  function fmtNum(v){ return (Math.round(v*10)/10); }
+
+  function renderDuration(rows){
+    var avgByStep = {};
+    DURATION_STEPS.forEach(function(step){
+      var vals = rows.map(function(r){ return r['Durasi_'+step]; }).filter(function(v){ return v !== null && v !== undefined; });
+      avgByStep[step] = vals.length ? Math.round((vals.reduce(function(s,v){ return s+v; },0) / vals.length) * 10) / 10 : null;
+    });
+
+    var maxValue = 0;
+    Object.keys(avgByStep).forEach(function(step){
+      if (avgByStep[step] !== null && avgByStep[step] > maxValue) maxValue = avgByStep[step];
+    });
+
+    var ef = computeEarliestFinish(avgByStep);
+
+    // Pemenang cabang paralel (Pembuatan Alur vs Permintaan Kabel+Pengiriman Kabel):
+    // yang MENANG (lebih panjang) itulah yang menentukan kapan Penarikan Kabel bisa mulai,
+    // karena Penarikan Kabel adalah titik gabungan yang menunggu KEDUANYA selesai.
+    var alurBranch = ef['Pembuatan Alur'] || 0;
+    var cableBranch = ef['Pengiriman Kabel'] || 0;
+    var cableWins = cableBranch >= alurBranch;
+
+    // Sejak Penarikan Kabel, semuanya jadi SATU rantai tunggal berurutan sampai Payment
+    // (Cut Over -> Opname/QC -> BOQ -> PR-PO -> BAST -> Invoice -> Payment) — tidak ada
+    // percabangan lagi setelah titik gabungan ini, jadi cukup SATU set "included/excluded"
+    // yang berlaku sama untuk Total Teknis maupun Total Keseluruhan.
+    var MERGED_TAIL = ['Penarikan Kabel','Cut Over','Opname/QC'];
+    var ADMIN_CHAIN = ['BOQ','PR-PO','BAST','Invoice','Payment'];
+    var included = cableWins
+      ? ['BA Survey','Permintaan Kabel','Pengiriman Kabel'].concat(MERGED_TAIL).concat(ADMIN_CHAIN)
+      : ['BA Survey','Pembuatan Alur'].concat(MERGED_TAIL).concat(ADMIN_CHAIN);
+    var teknisIncluded = included; // sama saja sekarang, tidak ada lagi percabangan terpisah di level Teknis
+    var overallIncluded = included;
+
+    var html = '';
+    STEP_GROUPS.forEach(function(group, gi){
+      html += '<div class="group-label">'+group.title+'</div>';
+      group.steps.forEach(function(step){
+        var v = avgByStep[step];
+        if (v === null){ html += durRowEmptyHtml(step); return; }
+        var totalLabel = (gi === 0) ? 'Total Teknis' : 'Total Keseluruhan';
+        html += durRowHtml(step, v, maxValue, included.indexOf(step) !== -1, totalLabel);
+      });
+    });
+    document.getElementById('pipelineDurasi').innerHTML = html;
+
+    function groupHasData(steps){
+      return steps.some(function(s){ return avgByStep[s] !== null; });
+    }
+
+    // Total Teknis = titik akhir bagian Teknis (Opname/QC), yang di dalamnya sudah
+    // otomatis memilih cabang terpanjang di titik gabungan Penarikan Kabel.
+    var teknisTotal = ef['Opname/QC'] || 0;
+    // Total Administrasi = rantai BOQ -> ... -> Payment saja (murni berurutan, tanpa BA Survey
+    // atau bagian Teknis), supaya angkanya menggambarkan "berapa lama urusan administrasinya sendiri".
+    var adminTotal = ADMIN_CHAIN
+      .map(function(s){ return avgByStep[s]; }).filter(function(v){ return v !== null; })
+      .reduce(function(s,v){ return s+v; }, 0);
+    // Total keseluruhan = titik akhir seluruh rantai (Payment) — sudah satu rantai tunggal,
+    // tidak ada lagi percabangan di level ini.
+    var total = ef['Payment'] || 0;
+
+    var teknisSteps = STEP_GROUPS[0].steps;
+    var adminSteps = STEP_GROUPS[1].steps;
+
+    document.getElementById('durTotal').textContent = fmtNum(total) + ' hari';
+    document.getElementById('durTotalTeknis').textContent = groupHasData(teknisSteps) ? (fmtNum(teknisTotal) + ' hari') : 'tidak ada data';
+    document.getElementById('durTotalAdmin').textContent = groupHasData(adminSteps) ? (fmtNum(adminTotal) + ' hari') : 'tidak ada data';
+  }
+
+  function renderKPIs(rows){
+    var totalRows = rows.length;
+    var uniqueProjects = new Set(rows.map(function(r){ return r['ID Project APJATEL']; })).size;
+    var outstanding = rows.filter(function(r){ return r['Statuss All Progress'] === 'On Going'; }).length;
+    var complete = rows.filter(function(r){ return r['Statuss All Progress'] === 'Complete'; }).length;
+    var avgProgress = totalRows ? (rows.reduce(function(s,r){ return s + (r['% Progress']||0); },0) / totalRows) : 0;
+
+    var html =
+      kpiCard('Total baris data', totalRows.toLocaleString('id-ID'), '') +
+      kpiCard('Project unik', uniqueProjects.toLocaleString('id-ID'), 'accent') +
+      kpiCard('Outstanding (on going)', outstanding.toLocaleString('id-ID'), 'warn') +
+      kpiCard('Selesai (complete)', complete.toLocaleString('id-ID'), 'good') +
+      kpiCard('Rata-rata progress', Math.round(avgProgress) + '%', '');
+    document.getElementById('kpis').innerHTML = html;
+
+    renderDataLastUpdate(rows);
+  }
+
+  function renderVendorLastUpdate(rows){
+    var now = Date.now();
+    var MS_PER_DAY = 24*60*60*1000;
+    var byVendor = {};
+    rows.forEach(function(r){
+      var v = r['Nama Vendor'] || 'Belum Ada Vendor';
+      if (!byVendor[v]) byVendor[v] = { count:0, maxTs:null };
+      byVendor[v].count++;
+      var ts = r['_TanggalTerbaru'];
+      if (ts !== null && ts !== undefined && (byVendor[v].maxTs === null || ts > byVendor[v].maxTs)){
+        byVendor[v].maxTs = ts;
+      }
+    });
+
+    var list = Object.keys(byVendor).map(function(v){
+      var d = byVendor[v];
+      var daysAgo = d.maxTs !== null ? Math.floor((now - d.maxTs) / MS_PER_DAY) : null;
+      var status, statusCls;
+      if (daysAgo === null){ status = 'Belum ada tanggal'; statusCls = 'b-none'; }
+      else if (daysAgo <= 7){ status = 'Aktif update'; statusCls = 'b-done'; }
+      else if (daysAgo <= 30){ status = 'Perlu diingatkan'; statusCls = 'b-og'; }
+      else { status = 'Sudah lama tidak update'; statusCls = 'b-bad'; }
+      return { name:v, count:d.count, maxTs:d.maxTs, daysAgo:daysAgo, status:status, statusCls:statusCls };
+    });
+
+    // urutkan: yang paling lama tidak update (atau belum pernah) di atas
+    list.sort(function(a,b){
+      if (a.daysAgo === null && b.daysAgo === null) return 0;
+      if (a.daysAgo === null) return -1;
+      if (b.daysAgo === null) return 1;
+      return b.daysAgo - a.daysAgo;
+    });
+
+    var good=0, warn=0, bad=0, none=0;
+    list.forEach(function(x){
+      if (x.daysAgo === null) none++;
+      else if (x.daysAgo <= 7) good++;
+      else if (x.daysAgo <= 30) warn++;
+      else bad++;
+    });
+    document.getElementById('muGood').textContent = good;
+    document.getElementById('muWarn').textContent = warn;
+    document.getElementById('muBad').textContent = bad;
+    document.getElementById('muNone').textContent = none;
+
+    var rowsHtml = list.map(function(x){
+      var tanggalText = x.maxTs !== null
+        ? new Date(x.maxTs).toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric' })
+        : '-';
+      var lamaText = x.daysAgo !== null ? (x.daysAgo + ' hari lalu') : '-';
+      return '<tr>' +
+        '<td>'+escapeHtml(x.name)+'</td>' +
+        '<td class="num">'+x.count+'</td>' +
+        '<td>'+tanggalText+'</td>' +
+        '<td class="num">'+lamaText+'</td>' +
+        '<td><span class="badge '+x.statusCls+'">'+x.status+'</span></td>' +
+      '</tr>';
+    }).join('');
+    document.getElementById('tblVendorUpdate').innerHTML = rowsHtml || '<tr><td colspan="5" class="empty">Tidak ada data</td></tr>';
+  }
+
+  function renderDataLastUpdate(rows){
+    var el = document.getElementById('dataLastUpdate');
+    var maxTs = null;
+    rows.forEach(function(r){
+      var ts = r['_TanggalTerbaru'];
+      if (ts !== null && ts !== undefined && (maxTs === null || ts > maxTs)) maxTs = ts;
+    });
+    if (maxTs === null){
+      el.textContent = 'Update data terakhir: tidak ada tanggal tercatat';
+      return;
+    }
+    var d = new Date(maxTs);
+    var formatted = d.toLocaleDateString('id-ID', { day:'2-digit', month:'long', year:'numeric' });
+    el.textContent = 'Update data terakhir: ' + formatted;
+  }
+
+  function kpiCard(label, val, cls){
+    return '<div class="kpi"><div class="lbl">'+label+'</div><div class="val '+cls+'">'+val+'</div></div>';
+  }
+
+  function stepTrackHtml(done, proses, belum, total){
+    var pDone = (done/total*100), pProses = (proses/total*100), pBelum = (belum/total*100);
+    var bg = '';
+    if (pDone > 0) bg += '<div class="seg done" style="width:'+pDone+'%" title="Done: '+done+'"></div>';
+    if (pProses > 0) bg += '<div class="seg proses" style="width:'+pProses+'%" title="Proses: '+proses+'"></div>';
+    if (pBelum > 0) bg += '<div class="seg belum" style="width:'+pBelum+'%" title="Belum: '+belum+'"></div>';
+
+    var labels = '';
+    var cursor = 0;
+    function addLabel(count, pct){
+      if (pct <= 0) return;
+      var center = cursor + pct / 2;
+      labels += '<span class="seg-label" style="left:'+center+'%;">'+count+'</span>';
+      cursor += pct;
+    }
+    addLabel(done, pDone);
+    addLabel(proses, pProses);
+    addLabel(belum, pBelum);
+
+    return '<div class="step-track">' + bg + '<div class="seg-labels">' + labels + '</div></div>';
+  }
+
+  function renderPipeline(rows){
+    var total = rows.length || 1;
+    var html = '';
+    STEP_GROUPS.forEach(function(group){
+      html += '<div class="group-label">'+group.title+'</div>';
+      group.steps.forEach(function(step){
+        var done=0, proses=0, belum=0;
+        rows.forEach(function(r){
+          var v = r[step];
+          if (v === 'Done') done++; else if (v === 'Proses') proses++; else belum++;
+        });
+        var pDone = (done/total*100);
+        html += '<div class="step-row">' +
+          '<div class="step-name">'+step+'</div>' +
+          stepTrackHtml(done, proses, belum, total) +
+          '<div class="step-pct">'+Math.round(pDone)+'% done &middot; '+done+'/'+total+'</div>' +
+        '</div>';
+      });
+    });
+    document.getElementById('pipeline').innerHTML = html;
+  }
+
+  function computeStepCounts(rows){
+    var counts = {};
+    STEPS.forEach(function(s){ counts[s] = { done:0, proses:0, belum:0 }; });
+    rows.forEach(function(r){
+      STEPS.forEach(function(s){
+        var v = r[s];
+        if (v === 'Done') counts[s].done++;
+        else if (v === 'Proses') counts[s].proses++;
+        else counts[s].belum++;
+      });
+    });
+    return counts;
+  }
+
+  function computeRowGap(row){
+    var doneIdx = [];
+    STEPS.forEach(function(s, i){ if (row[s] === 'Done') doneIdx.push(i); });
+    if (doneIdx.length < 2) return null;
+    var maxLen = 0, maxStart = -1;
+    for (var k = 0; k < doneIdx.length - 1; k++){
+      var len = doneIdx[k+1] - doneIdx[k] - 1;
+      if (len > maxLen){ maxLen = len; maxStart = doneIdx[k] + 1; }
+    }
+    if (maxLen <= 0) return null;
+    return { step: STEPS[maxStart], length: maxLen };
+  }
+
+  function findBottleneck(rows){
+    var tally = {};
+    var rowsWithGap = 0;
+    rows.forEach(function(r){
+      var g = computeRowGap(r);
+      if (g){
+        rowsWithGap++;
+        if (!tally[g.step]) tally[g.step] = { count:0, totalLen:0 };
+        tally[g.step].count++;
+        tally[g.step].totalLen += g.length;
+      }
+    });
+    var best = null;
+    STEPS.forEach(function(step){
+      var t = tally[step];
+      if (t && (!best || t.count > best.count)){
+        best = { step:step, count:t.count, avgLen: Math.round((t.totalLen / t.count) * 10) / 10 };
+      }
+    });
+    return best;
+  }
+
+  function renderGroup(rows, field, chartId, tblId, color){
+    var map = {};
+    rows.forEach(function(r){
+      var key = r[field] || 'Unknown';
+      if (!map[key]) map[key] = { total:0, outstanding:0, complete:0, rows:[] };
+      map[key].total++;
+      map[key].rows.push(r);
+      if (r['Statuss All Progress'] === 'On Going') map[key].outstanding++;
+      if (r['Statuss All Progress'] === 'Complete') map[key].complete++;
+    });
+    var list = Object.keys(map).map(function(k){
+      var m = map[k];
+      var bottleneck = findBottleneck(m.rows);
+      return { name:k, total:m.total, outstanding:m.outstanding, complete:m.complete,
+               pct: m.total ? Math.round(m.complete/m.total*100) : 0, bottleneck:bottleneck, rows:m.rows };
+    });
+    list.sort(function(a,b){ return b.outstanding - a.outstanding; });
+
+    var top = list.slice(0,12);
+    drawBarChart(chartId, top.map(function(x){return x.name;}), top.map(function(x){return x.outstanding;}), color, 'Outstanding');
+
+    var rowsHtml = list.map(function(x, i){
+      var bnHtml = x.bottleneck
+        ? '<span class="badge b-og">'+escapeHtml(x.bottleneck.step)+' &middot; '+x.bottleneck.count+' proyek terjebak (gap '+x.bottleneck.avgLen+' tahap)</span>'
+        : '<span class="badge b-done">Tidak ada gap tersendat</span>';
+      return '<tr class="grp-row" data-idx="'+i+'" data-field="'+field+'">' +
+             '<td>'+escapeHtml(x.name)+'</td>' +
+             '<td class="num">'+x.outstanding+'</td>' +
+             '<td class="num">'+x.total+'</td>' +
+             '<td class="num">'+x.pct+'%</td>' +
+             '<td>'+bnHtml+'</td></tr>' +
+             '<tr class="grp-detail" id="'+tblId+'-detail-'+i+'" style="display:none;"><td colspan="5"></td></tr>';
+    }).join('');
+    var tbody = document.getElementById(tblId);
+    tbody.innerHTML = rowsHtml || '<tr><td colspan="5" class="empty">Tidak ada data</td></tr>';
+
+    tbody.querySelectorAll('.grp-row').forEach(function(tr){
+      tr.addEventListener('click', function(){
+        var idx = tr.getAttribute('data-idx');
+        var detailRow = document.getElementById(tblId+'-detail-'+idx);
+        var isOpen = detailRow.style.display !== 'none';
+        tbody.querySelectorAll('.grp-detail').forEach(function(d){ d.style.display = 'none'; });
+        if (!isOpen){
+          var item = list[idx];
+          detailRow.querySelector('td').innerHTML = buildStageDetailHtml(computeStepCounts(item.rows), item.rows.length);
+          var locBtn = detailRow.querySelector('[data-locbtn]');
+          if (locBtn) locBtn.addEventListener('click', function(){ openLocationModal(item.name, item.rows); });
+          detailRow.style.display = 'table-row';
+        }
+      });
+    });
+  }
+
+  function buildStageDetailHtml(stepCounts, rowCount){
+    var html = '<div class="stage-detail">';
+    STEP_GROUPS.forEach(function(group){
+      html += '<div class="stage-detail-group"><div class="stage-detail-title">'+group.title+'</div>';
+      group.steps.forEach(function(s){
+        var c = stepCounts[s];
+        var total = c.done + c.proses + c.belum;
+        var pct = total ? (c.done/total*100) : 0;
+        html += '<div class="stage-chip">' +
+          '<span class="stage-chip-name">'+s+'</span>' +
+          '<div class="stage-chip-track"><div class="stage-chip-fill" style="width:'+pct+'%"></div></div>' +
+          '<span class="stage-chip-nums">'+c.done+' done &middot; '+c.proses+' proses &middot; '+c.belum+' belum</span>' +
+        '</div>';
+      });
+      html += '</div>';
+    });
+    html += '</div>';
+    html += '<div class="loc-open-row"><button class="btn" data-locbtn="1">Lihat ruas lokasi relokasi (' + rowCount + ' project) &rarr;</button></div>';
+    return html;
+  }
+
+  function renderYear(rows){
+    var map = {};
+    rows.forEach(function(r){
+      var y = r['Waktu Relokasi'] || 'Tidak diketahui';
+      if (!map[y]) map[y] = { total:0, outstanding:0, complete:0 };
+      map[y].total++;
+      if (r['Statuss All Progress'] === 'On Going') map[y].outstanding++;
+      if (r['Statuss All Progress'] === 'Complete') map[y].complete++;
+    });
+    var years = Object.keys(map).sort();
+    drawBarChart('chartYear', years, years.map(function(y){return map[y].outstanding;}), themeVar('--proses'), 'Outstanding');
+
+    var rowsHtml = years.map(function(y){
+      var m = map[y];
+      return '<tr><td>'+y+'</td><td class="num">'+m.outstanding+'</td><td class="num">'+m.complete+'</td><td class="num">'+m.total+'</td></tr>';
+    }).join('');
+    document.getElementById('tblYear').innerHTML = rowsHtml || '<tr><td colspan="4" class="empty">Tidak ada data</td></tr>';
+  }
+
+  function stageDotsHtml(row){
+    var html = '<div class="stage-dots">';
+    STEP_GROUPS.forEach(function(group, gi){
+      if (gi > 0) html += '<div class="stage-dots-gap"></div>';
+      group.steps.forEach(function(step){
+        var v = row[step];
+        var cls = v === 'Done' ? 'done' : (v === 'Proses' ? 'proses' : 'belum');
+        html += '<div class="stage-dot '+cls+'" title="'+escapeHtml(step)+': '+escapeHtml(v||'Belum')+'"></div>';
+      });
+    });
+    html += '</div>';
+    return html;
+  }
+
+  function renderDetail(rows){
+    var totalRows = rows.length;
+    var totalPages = Math.max(1, Math.ceil(totalRows / DETAIL_PAGE_SIZE));
+    if (detailPage > totalPages) detailPage = totalPages;
+    if (detailPage < 1) detailPage = 1;
+
+    var start = (detailPage - 1) * DETAIL_PAGE_SIZE;
+    var pageRows = rows.slice(start, start + DETAIL_PAGE_SIZE);
+
+    var body = pageRows.map(function(r){
+      var picMitra = [r['PIC Mitra - Teknis'], r['PIC Mitra - Administrasi']].filter(Boolean).join(' / ') || '-';
+      var picOperator = [r['PIC Operator - Teknis'], r['PIC Operator - Administrasi']].filter(Boolean).join(' / ') || '-';
+      var statusCls = r['Status Relokasi'] === 'Done' ? 'b-done' : 'b-og';
+      return '<tr>' +
+        '<td>'+escapeHtml(r['Lokasi Relokasi']||'-')+'</td>' +
+        '<td>'+escapeHtml(r['Nama Vendor']||'-')+'</td>' +
+        '<td>'+escapeHtml(r['Nama Operator']||'-')+'</td>' +
+        '<td class="num">'+escapeHtml(r['Waktu Relokasi']||'-')+'</td>' +
+        '<td><span class="badge '+statusCls+'">'+escapeHtml(r['Status Relokasi']||'-')+'</span></td>' +
+        '<td>' +
+          '<div class="detail-pic-line"><b>Mitra:</b> '+escapeHtml(picMitra)+'</div>' +
+          '<div class="detail-pic-line"><b>Operator:</b> '+escapeHtml(picOperator)+'</div>' +
+        '</td>' +
+        '<td>'+stageDotsHtml(r)+'</td>' +
+      '</tr>';
+    }).join('');
+
+    document.getElementById('tblDetail').innerHTML = body || '<tr><td colspan="7" class="empty">Tidak ada data</td></tr>';
+
+    var showingFrom = totalRows === 0 ? 0 : start + 1;
+    var showingTo = Math.min(start + DETAIL_PAGE_SIZE, totalRows);
+    document.getElementById('detailPageInfo').textContent =
+      'Menampilkan ' + showingFrom + '-' + showingTo + ' dari ' + totalRows + ' baris (Halaman ' + detailPage + ' dari ' + totalPages + ')';
+    document.getElementById('detailPrev').disabled = (detailPage <= 1);
+    document.getElementById('detailNext').disabled = (detailPage >= totalPages);
+  }
+
+  document.getElementById('detailPrev').addEventListener('click', function(){
+    detailPage--;
+    renderDetail(CURRENT_ROWS);
+  });
+  document.getElementById('detailNext').addEventListener('click', function(){
+    detailPage++;
+    renderDetail(CURRENT_ROWS);
+  });
+
+
+  function themeVar(name){
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+
+  function drawBarChart(id, labels, data, color, seriesLabel){
+    var ctx = document.getElementById(id);
+    if (charts[id]) charts[id].destroy();
+    var tickColor = themeVar('--chart-tick');
+    var gridColor = themeVar('--chart-grid');
+    var labelColor = themeVar('--chart-label');
+    charts[id] = new Chart(ctx, {
+      type:'bar',
+      data:{ labels:labels, datasets:[{ label:seriesLabel, data:data, backgroundColor:color, borderRadius:4, maxBarThickness:22 }] },
+      options:{
+        indexAxis:'y',
+        responsive:true, maintainAspectRatio:false,
+        layout:{ padding:{ right:26 } },
+        plugins:{
+          legend:{ display:false },
+          datalabels:{
+            anchor:'end', align:'end', offset:2,
+            color:labelColor, font:{ family:'Space Grotesk, monospace', size:11, weight:'600' },
+            formatter:function(v){ return v; }
+          }
+        },
+        scales:{
+          x:{ ticks:{ color:tickColor }, grid:{ color:gridColor } },
+          y:{ ticks:{ color:labelColor, font:{size:11} }, grid:{ display:false } }
+        }
+      }
+    });
+  }
+
+  function buildLocationTableHtml(rows){
+    var sorted = rows.slice().sort(function(a,b){
+      return String(a['Lokasi Relokasi']||'').localeCompare(String(b['Lokasi Relokasi']||''));
+    });
+    var body = sorted.map(function(r){
+      var gap = computeRowGap(r);
+      var gapHtml = gap
+        ? '<span class="badge b-og">'+escapeHtml(gap.step)+' &middot; gap '+gap.length+' tahap</span>'
+        : '<span class="badge b-done">Tidak ada gap</span>';
+      var picMitra = [r['PIC Mitra - Teknis'], r['PIC Mitra - Administrasi']].filter(Boolean).join(' / ') || '-';
+      var picOperator = [r['PIC Operator - Teknis'], r['PIC Operator - Administrasi']].filter(Boolean).join(' / ') || '-';
+      return '<tr>' +
+        '<td class="num" style="text-align:left;font-family:\'Space Grotesk\',monospace;color:var(--accent);">'+escapeHtml(r['ID Project APJATEL']||'-')+'</td>' +
+        '<td>'+escapeHtml(r['Lokasi Relokasi']||'-')+'</td>' +
+        '<td>'+escapeHtml(r['Wilayah']||'-')+'</td>' +
+        '<td>'+escapeHtml(r['Status Relokasi']||'-')+'</td>' +
+        '<td>'+gapHtml+'</td>' +
+        '<td style="font-size:11px;">'+escapeHtml(picMitra)+'</td>' +
+        '<td style="font-size:11px;">'+escapeHtml(picOperator)+'</td>' +
+      '</tr>';
+    }).join('');
+    return '<table><thead><tr>' +
+      '<th>ID Project</th><th>Ruas lokasi relokasi</th><th>Wilayah</th><th>Status relokasi</th><th>Tahapan tersendat</th><th>PIC mitra</th><th>PIC operator</th>' +
+      '</tr></thead><tbody>' + (body || '<tr><td colspan="7" class="empty">Tidak ada data</td></tr>') + '</tbody></table>';
+  }
+
+  function openLocationModal(name, rows){
+    document.getElementById('locModalTitle').textContent = name;
+    document.getElementById('locModalSub').textContent = rows.length + ' project ruas lokasi relokasi';
+    document.getElementById('locModalBody').innerHTML = buildLocationTableHtml(rows);
+    document.getElementById('locModal').style.display = 'flex';
+  }
+
+  function closeLocationModal(){
+    document.getElementById('locModal').style.display = 'none';
+  }
+
+  document.getElementById('locModalClose').addEventListener('click', closeLocationModal);
+  document.getElementById('locModal').addEventListener('click', function(e){
+    if (e.target.id === 'locModal') closeLocationModal();
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape') closeLocationModal();
+  });
+
+  function setTimestamp(){
+    var now = new Date();
+    document.getElementById('refreshTs').textContent = 'Terakhir update: ' + now.toLocaleTimeString('id-ID');
+  }
+
+  function refreshData(){
+    var btn = document.getElementById('btn-refresh');
+    btn.disabled = true;
+    btn.textContent = '\u21BB Memuat...';
+
+    // simpan pilihan filter saat ini supaya tidak reset setelah refresh
+    var keep = {
+      tahun: FILTER_STATE.tahun.slice(),
+      wilayah: FILTER_STATE.wilayah.slice(),
+      status: FILTER_STATE.status.slice(),
+      kattahap: document.getElementById('f-kattahap').value,
+      tahapan: document.getElementById('f-tahapan').value,
+      statustahap: document.getElementById('f-statustahap').value,
+      search: document.getElementById('f-search').value
+    };
+
+    google.script.run.withSuccessHandler(function(rows){
+      RAW = rows || [];
+      document.getElementById('f-kattahap').innerHTML = '<option value="">Semua</option>';
+      buildFilters();
+
+      ['tahun','wilayah','status'].forEach(function(key){
+        FILTER_STATE[key] = keep[key].filter(function(v){
+          // hanya pertahankan pilihan yang masih ada di data terbaru
+          return document.querySelector('#msel-'+key+'-panel input[value="'+CSS.escape(v)+'"]') !== null;
+        });
+        document.querySelectorAll('#msel-'+key+'-panel input[type=checkbox]').forEach(function(cb){
+          cb.checked = FILTER_STATE[key].indexOf(cb.value) !== -1;
+        });
+        updateMultiSelectLabel(key);
+      });
+
+      document.getElementById('f-kattahap').value = keep.kattahap;
+      populateTahapanOptions();
+      document.getElementById('f-tahapan').value = keep.tahapan;
+      document.getElementById('f-statustahap').value = keep.statustahap;
+      document.getElementById('f-search').value = keep.search;
+
+      render();
+      setTimestamp();
+      btn.disabled = false;
+      btn.innerHTML = '&#8635; Refresh data';
+    }).withFailureHandler(function(err){
+      onDataError(err);
+      btn.disabled = false;
+      btn.innerHTML = '&#8635; Refresh data';
+    }).getDashboardData(CURRENT_USER);
+  }
+
+  document.getElementById('btn-refresh').addEventListener('click', refreshData);
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+</script>
+<script>
+  /* =====================================================================
+   * TAB NAVIGATION + FITUR INPUT/UPDATE/DELETE (BOQ & STATUS RELOKASI)
+   * ===================================================================== */
+  var BOQ_FIELDS_CONFIG = null, STATUS_FIELDS_CONFIG = null;
+  var BOQ_ROWS = [], STATUS_ROWS = [];
+  var BOQ_EDIT_ROW = null, STATUS_EDIT_ROW = null;
+  var REF_LOKASI = [];           // referensi dari sheet "Data Relokasi", untuk auto-isi form BOQ
+  var REF_SOURCE = [];           // katalog Category Item/ID Item/Description/Satuan dari sheet "Source"
+  var REF_OPERATOR = [];         // daftar nama operator dari sheet "Nama Operator"
+  var LOKASI_OPERATOR_OPTIONS = []; // kombinasi lokasi+operator dari BOQ yang belum ditrack di Status Relokasi
+  var RELOKASI_ROWS = [], RELOKASI_LOADED = false, RELOKASI_MAP_OBJ = null, PETA_LOADED = false;
+
+  document.querySelectorAll('.tabnav-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var tab = btn.getAttribute('data-tab');
+      document.querySelectorAll('.tabnav-btn').forEach(function(b){ b.classList.remove('active'); });
+      btn.classList.add('active');
+      ['dashboard','boq','status','relokasi','peta'].forEach(function(t){
+        document.getElementById('tabpage-'+t).style.display = (t===tab) ? 'block' : 'none';
+      });
+      if (tab === 'boq' && !BOQ_FIELDS_CONFIG) loadBoqTab();
+      if (tab === 'status' && !STATUS_FIELDS_CONFIG) loadStatusTab();
+      if (tab === 'relokasi' && !RELOKASI_LOADED) loadRelokasiTab();
+      if (tab === 'peta' && !PETA_LOADED) loadPetaTab();
+      if (tab === 'peta' && RELOKASI_MAP_OBJ) setTimeout(function(){ RELOKASI_MAP_OBJ.invalidateSize(); }, 60);
+    });
+  });
+
+  function closeCrudModal(){ document.getElementById('crudModal').style.display = 'none'; }
+  document.getElementById('crudModalClose').addEventListener('click', closeCrudModal);
+  document.getElementById('crudModal').addEventListener('click', function(e){ if (e.target.id === 'crudModal') closeCrudModal(); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeCrudModal(); });
+
+  function fmtRupiah(v){ return 'Rp' + (Number(v)||0).toLocaleString('id-ID'); }
+
+  /** Input teks + datalist supaya semua dropdown bisa diketik untuk cari (seperti Lokasi Relokasi) */
+  function searchableFieldHtml(id, options, val, extraAttrs){
+    val = val || '';
+    extraAttrs = extraAttrs || '';
+    return '<input type="text" id="' + id + '" list="' + id + '-list" value="' + escapeHtml(val) + '" autocomplete="off"' + extraAttrs + '>' +
+      '<datalist id="' + id + '-list">' + options.map(function(o){ return '<option value="' + escapeHtml(o) + '">'; }).join('') + '</datalist>';
+  }
+
+  /* ---------------------- TAB: INPUT & UPDATE BOQ ---------------------- */
+
+  function loadBoqTab(){
+    document.getElementById('boq-tbody').innerHTML = '<tr><td class="crud-empty" colspan="9">Memuat data...</td></tr>';
+    google.script.run.withSuccessHandler(function(cfg){
+      BOQ_FIELDS_CONFIG = cfg;
+      google.script.run.withSuccessHandler(function(rows){ REF_LOKASI = rows || []; }).withFailureHandler(function(){ REF_LOKASI = []; }).getBoqReferensiLokasi(CURRENT_USER);
+      google.script.run.withSuccessHandler(function(rows){ REF_SOURCE = rows || []; }).withFailureHandler(function(){ REF_SOURCE = []; }).getBoqSourceCatalog(CURRENT_USER);
+      google.script.run.withSuccessHandler(function(rows){ REF_OPERATOR = rows || []; }).withFailureHandler(function(){ REF_OPERATOR = []; }).getOperatorList(CURRENT_USER);
+      loadBoqTabDataOnly();
+    }).withFailureHandler(boqLoadError).getBoqFieldsConfig();
+  }
+  function boqLoadError(err){
+    document.getElementById('boq-tbody').innerHTML =
+      '<tr><td class="crud-empty" colspan="9">Gagal memuat: ' + escapeHtml((err && err.message) || String(err)) + '</td></tr>';
+  }
+  function loadBoqTabDataOnly(){
+    google.script.run.withSuccessHandler(function(rows){
+      BOQ_ROWS = rows || [];
+      renderBoqTable();
+    }).withFailureHandler(boqLoadError).getBoqList(CURRENT_USER);
+  }
+  function renderBoqTable(){
+    var q = (document.getElementById('boq-search').value || '').trim().toLowerCase();
+    var filtered = BOQ_ROWS.filter(function(r){
+      if (!q) return true;
+      return [r.idProject, r.lokasi, r.namaVendor, r.namaOperator, r.idItem, r.description].some(function(v){
+        return String(v || '').toLowerCase().indexOf(q) !== -1;
+      });
+    });
+    document.getElementById('boq-count').textContent = filtered.length + ' item BOQ' + (q ? ' (dari total ' + BOQ_ROWS.length + ')' : '');
+    var tbody = document.getElementById('boq-tbody');
+    if (!filtered.length){
+      tbody.innerHTML = '<tr><td class="crud-empty" colspan="9">Tidak ada data.</td></tr>';
+      return;
+    }
+    var canDelete = CURRENT_USER.kategori === 'Admin';
+    tbody.innerHTML = filtered.map(function(r){
+      return '<tr>' +
+        '<td>' + escapeHtml(r.idProject) + '</td>' +
+        '<td>' + escapeHtml(r.lokasi) + '</td>' +
+        '<td>' + escapeHtml(r.namaVendor) + '</td>' +
+        '<td>' + escapeHtml(r.namaOperator) + '</td>' +
+        '<td>' + escapeHtml(r.idItem) + '</td>' +
+        '<td style="max-width:220px;">' + escapeHtml(r.description) + '</td>' +
+        '<td>' + escapeHtml(r.qty) + '</td>' +
+        '<td>' + escapeHtml(r.satuan) + '</td>' +
+        '<td class="crud-actions">' +
+          '<button class="btn" onclick="openBoqForm(' + r._row + ')">Edit</button>' +
+          (canDelete ? '<button class="btn btn-danger" onclick="deleteBoqRow(' + r._row + ')">Hapus</button>' : '') +
+        '</td>' +
+      '</tr>';
+    }).join('');
+  }
+  document.getElementById('boq-search').addEventListener('input', renderBoqTable);
+  document.getElementById('btn-boq-add').addEventListener('click', function(){ openBoqForm(null); });
+
+  // Field BOQ yang otomatis terisi dari referensi "Data Relokasi" saat Lokasi Relokasi dipilih/diketik
+  var BOQ_AUTOFILL_KEYS = ['idProject','kategoriProgram','namaProgram','namaInstansi','statusVendor',
+    'namaVendor','waktuRelokasi','wilayah','panjangJalur','startRelokasi','endRelokasi','status'];
+  // Field yang otomatis terisi dari katalog "Source" saat Deskripsi Item BOQ dipilih
+  var BOQ_SOURCE_DERIVED_KEYS = ['categoryItem','idItem','satuan'];
+
+  function applyLokasiAutofill(ref){
+    var lockVendor = CURRENT_USER.kategori === 'Vendor';
+    BOQ_AUTOFILL_KEYS.forEach(function(key){
+      if (key === 'namaVendor' && lockVendor) return; // jangan timpa nama vendor akun sendiri
+      var el = document.getElementById('bf-' + key);
+      if (el && ref[key] !== undefined && ref[key] !== '') el.value = ref[key];
+    });
+  }
+  function applySourceAutofill(ref){
+    BOQ_SOURCE_DERIVED_KEYS.forEach(function(key){
+      var el = document.getElementById('bf-' + key);
+      if (el) el.value = ref[key] || '';
+    });
+  }
+
+  function openBoqForm(rowNum){
+    BOQ_EDIT_ROW = rowNum;
+    var rec = rowNum ? BOQ_ROWS.filter(function(r){ return r._row === rowNum; })[0] : null;
+    document.getElementById('crudModalTitle').textContent = rowNum ? 'Edit Item BOQ' : 'Tambah Item BOQ';
+    document.getElementById('crudModalSub').textContent = rowNum ? ('Baris data #' + rowNum) : 'Isi data item BOQ baru';
+    var lockVendor = CURRENT_USER.kategori === 'Vendor';
+    var lockOperator = CURRENT_USER.kategori === 'Operator';
+    var BOQ_MANUAL_KEYS = ['namaOperator', 'qty', 'description'];
+    var html = '<div class="form-error" id="crudFormError"></div>';
+    html += '<p class="sub" style="margin:-4px 0 10px;">Kotak putih <b>Lokasi Relokasi</b> wajib dipilih dari daftar - field abu-abu otomatis terisi (dari "Data Relokasi" &amp; "Source") - field kuning/oranye wajib diisi manual.</p>';
+    html += '<div class="form-grid">';
+    BOQ_FIELDS_CONFIG.forEach(function(f){
+      var val = rec ? (rec[f.key] !== undefined ? rec[f.key] : '') : '';
+      if (f.key === 'namaOperator' && !rec && lockOperator) val = CURRENT_USER.namaList ? CURRENT_USER.namaList[0] : CURRENT_USER.nama;
+      var isAuto = BOQ_AUTOFILL_KEYS.indexOf(f.key) !== -1 || BOQ_SOURCE_DERIVED_KEYS.indexOf(f.key) !== -1;
+      var isManual = BOQ_MANUAL_KEYS.indexOf(f.key) !== -1;
+      var full = (f.key === 'description') ? ' full' : '';
+      var extraClass = full + (isAuto ? ' ff-auto' : '') + (f.key === 'lokasi' ? ' ff-highlight' : '') + (isManual ? ' ff-manual' : '');
+      var locked = isAuto || (f.key === 'namaOperator' && lockOperator);
+      html += '<div class="form-field' + extraClass + '"><label>' + escapeHtml(f.label) + (f.required ? ' *' : '') + '</label>';
+      if (f.key === 'description'){
+        html += searchableFieldHtml('bf-description', REF_SOURCE.map(function(r){ return r.description; }), val, ' placeholder="- pilih deskripsi item -"');
+      } else if (f.key === 'namaOperator'){
+        html += searchableFieldHtml('bf-namaOperator', REF_OPERATOR, val, (locked ? ' disabled' : '') + ' placeholder="- pilih nama operator -"');
+      } else if (f.type === 'select'){
+        html += searchableFieldHtml('bf-' + f.key, f.options, val, locked ? ' disabled' : '');
+      } else if (f.key === 'lokasi'){
+        html += '<input type="text" id="bf-' + f.key + '" list="lokasiRefList" value="' + escapeHtml(val) + '" autocomplete="off">';
+      } else {
+        var type = f.type === 'date' ? 'date' : (f.type === 'number' ? 'number' : 'text');
+        html += '<input type="' + type + '" id="bf-' + f.key + '" value="' + escapeHtml(val) + '"' + (locked ? ' disabled' : '') + '>';
+      }
+      html += '</div>';
+    });
+    html += '</div><datalist id="lokasiRefList">' + REF_LOKASI.map(function(r){ return '<option value="' + escapeHtml(r.lokasi) + '">'; }).join('') + '</datalist>';
+    html += '<div class="form-actions"><button class="btn" id="crudCancelBtn">Batal</button><button class="btn btn-accent" id="crudSaveBtn">Simpan</button></div>';
+    document.getElementById('crudModalBody').innerHTML = html;
+    document.getElementById('crudCancelBtn').addEventListener('click', closeCrudModal);
+    document.getElementById('crudSaveBtn').addEventListener('click', saveBoq);
+    var lokasiEl = document.getElementById('bf-lokasi');
+    if (lokasiEl){
+      lokasiEl.addEventListener('input', function(){
+        var typed = lokasiEl.value.trim().toLowerCase();
+        var match = REF_LOKASI.filter(function(r){ return r.lokasi.trim().toLowerCase() === typed; })[0];
+        if (match) applyLokasiAutofill(match);
+      });
+    }
+    var descEl = document.getElementById('bf-description');
+    if (descEl){
+      descEl.addEventListener('input', function(){
+        var match = REF_SOURCE.filter(function(r){ return r.description === descEl.value; })[0];
+        if (match) applySourceAutofill(match);
+      });
+    }
+    document.getElementById('crudModal').style.display = 'flex';
+  }
+
+  function saveBoq(){
+    var data = {};
+    BOQ_FIELDS_CONFIG.forEach(function(f){
+      var el = document.getElementById('bf-' + f.key);
+      data[f.key] = el ? el.value : '';
+    });
+    if (CURRENT_USER.kategori === 'Operator' && !BOQ_EDIT_ROW) data.namaOperator = CURRENT_USER.namaList ? CURRENT_USER.namaList[0] : CURRENT_USER.nama;
+    var btn = document.getElementById('crudSaveBtn');
+    btn.disabled = true; btn.textContent = 'Menyimpan...';
+    var onOk = function(){ closeCrudModal(); loadBoqTabDataOnly(); };
+    var onErr = function(err){
+      btn.disabled = false; btn.textContent = 'Simpan';
+      var el = document.getElementById('crudFormError');
+      el.textContent = (err && err.message) ? err.message : String(err);
+      el.style.display = 'block';
+    };
+    if (BOQ_EDIT_ROW){
+      google.script.run.withSuccessHandler(onOk).withFailureHandler(onErr).updateBoq(CURRENT_USER, BOQ_EDIT_ROW, data);
+    } else {
+      google.script.run.withSuccessHandler(onOk).withFailureHandler(onErr).addBoq(CURRENT_USER, data);
+    }
+  }
+
+  function deleteBoqRow(rowNum){
+    if (!confirm('Hapus item BOQ ini? Tindakan ini tidak bisa dibatalkan.')) return;
+    google.script.run.withSuccessHandler(function(){ loadBoqTabDataOnly(); }).withFailureHandler(function(err){
+      alert('Gagal menghapus: ' + ((err && err.message) || String(err)));
+    }).deleteBoq(CURRENT_USER, rowNum);
+  }
+
+  /* ---------------------- TAB: UPDATE STATUS RELOKASI ---------------------- */
+
+  function loadStatusTab(){
+    document.getElementById('status-tbody').innerHTML = '<tr><td class="crud-empty" colspan="6">Memuat data...</td></tr>';
+    google.script.run.withSuccessHandler(function(cfg){
+      STATUS_FIELDS_CONFIG = cfg;
+      loadStatusTabDataOnly();
+    }).withFailureHandler(statusLoadError).getStatusFieldsConfig();
+  }
+  function statusLoadError(err){
+    document.getElementById('status-tbody').innerHTML =
+      '<tr><td class="crud-empty" colspan="6">Gagal memuat: ' + escapeHtml((err && err.message) || String(err)) + '</td></tr>';
+  }
+  function loadStatusTabDataOnly(){
+    google.script.run.withSuccessHandler(function(rows){
+      STATUS_ROWS = rows || [];
+      renderStatusTable();
+    }).withFailureHandler(statusLoadError).getStatusCrudList(CURRENT_USER);
+  }
+  function miniStepsHtml(rec){
+    function rowFor(categoryName){
+      var stepsInGroup = STATUS_FIELDS_CONFIG.steps.filter(function(s){ return STATUS_FIELDS_CONFIG.stepCategory[s] === categoryName; });
+      return '<div class="mini-steps">' + stepsInGroup.map(function(step){
+        var v = rec['step_' + step];
+        var color = v === 'Done' ? 'var(--done)' : (v === 'Proses' ? 'var(--proses)' : 'var(--seg-belum)');
+        return '<span class="mini-step" style="background:' + color + '" title="' + escapeHtml(step) + ': ' + v + '"></span>';
+      }).join('') + '</div>';
+    }
+    return rowFor('Teknis') + rowFor('Administrasi');
+  }
+  function renderStatusTable(){
+    var q = (document.getElementById('status-search').value || '').trim().toLowerCase();
+    var filtered = STATUS_ROWS.filter(function(r){
+      if (!q) return true;
+      return [r.idProject, r.lokasi, r.namaVendor, r.namaOperator].some(function(v){
+        return String(v || '').toLowerCase().indexOf(q) !== -1;
+      });
+    });
+    document.getElementById('status-count').textContent = filtered.length + ' project' + (q ? ' (dari total ' + STATUS_ROWS.length + ')' : '');
+    var tbody = document.getElementById('status-tbody');
+    if (!filtered.length){
+      tbody.innerHTML = '<tr><td class="crud-empty" colspan="6">Tidak ada data.</td></tr>';
+      return;
+    }
+    var canDelete = CURRENT_USER.kategori === 'Admin';
+    tbody.innerHTML = filtered.map(function(r){
+      return '<tr>' +
+        '<td>' + escapeHtml(r.idProject) + '</td>' +
+        '<td>' + escapeHtml(r.lokasi) + '</td>' +
+        '<td>' + escapeHtml(r.namaVendor) + '</td>' +
+        '<td>' + escapeHtml(r.namaOperator) + '</td>' +
+        '<td>' + miniStepsHtml(r) + '</td>' +
+        '<td class="crud-actions">' +
+          '<button class="btn" onclick="openStatusForm(' + r._row + ')">Update</button>' +
+          (canDelete ? '<button class="btn btn-danger" onclick="deleteStatusRow(' + r._row + ')">Hapus</button>' : '') +
+        '</td>' +
+      '</tr>';
+    }).join('');
+  }
+  document.getElementById('status-search').addEventListener('input', renderStatusTable);
+  document.getElementById('btn-status-add').addEventListener('click', function(){ openAddStatusForm(); });
+
+  // Field meta yang otomatis (readonly) waktu Tambah Project - datanya ikut dari BOQ/"Data Relokasi"
+  var STATUS_AUTOFILL_KEYS = ['idProject','kategoriProgram','namaProgram','namaInstansi','namaVendor','waktuRelokasi','wilayah','statusRelokasi'];
+
+  /** Form "Tambah Project" - inline dengan Data BOQ: pilih Lokasi+Operator yang sudah ada di BOQ */
+  function openAddStatusForm(){
+    STATUS_EDIT_ROW = null;
+    document.getElementById('crudModalTitle').textContent = 'Tambah Project Relokasi';
+    document.getElementById('crudModalSub').textContent = 'Pilih Lokasi & Operator yang datanya sudah diinput di BOQ - field lain otomatis terisi';
+    var btn = document.getElementById('crudSaveBtn');
+    var body = document.getElementById('crudModalBody');
+    body.innerHTML = '<p class="sub">Memuat pilihan lokasi dari data BOQ...</p>';
+    document.getElementById('crudModal').style.display = 'flex';
+
+    google.script.run.withSuccessHandler(function(opts){
+      LOKASI_OPERATOR_OPTIONS = opts || [];
+      if (!LOKASI_OPERATOR_OPTIONS.length){
+        body.innerHTML = '<p class="sub">Tidak ada kombinasi Lokasi + Operator baru yang bisa ditambahkan. ' +
+          'Semua kombinasi dari data BOQ mungkin sudah punya tracking status, atau belum ada data BOQ untuk Anda.</p>' +
+          '<div class="form-actions"><button class="btn" id="crudCancelBtn">Tutup</button></div>';
+        document.getElementById('crudCancelBtn').addEventListener('click', closeCrudModal);
+        return;
+      }
+      var html = '<div class="form-error" id="crudFormError"></div>';
+      html += '<p class="sub" style="margin:-4px 0 10px;">Kotak putih wajib dipilih - field abu-abu otomatis terisi - field kuning/oranye wajib diisi manual. Semua dropdown bisa diketik untuk mencari.</p>';
+      html += '<div class="form-grid">';
+      html += '<div class="form-field ff-highlight"><label>Lokasi Relokasi (dari BOQ) *</label>' +
+        searchableFieldHtml('stf-lokasi', LOKASI_OPERATOR_OPTIONS.map(function(o){ return o.lokasi; }), LOKASI_OPERATOR_OPTIONS[0].lokasi) +
+        '</div>';
+      html += '<div class="form-field ff-highlight"><label>Nama Operator (dari BOQ) *</label>' +
+        searchableFieldHtml('stf-operator', [], '') +
+        '</div>';
+      STATUS_AUTOFILL_KEYS.forEach(function(key){
+        var f = STATUS_FIELDS_CONFIG.meta.filter(function(m){ return m.key === key; })[0];
+        html += '<div class="form-field ff-auto"><label>' + escapeHtml(f ? f.label : key) + '</label><input type="text" id="sf-' + key + '" disabled></div>';
+      });
+      STATUS_FIELDS_CONFIG.meta.forEach(function(f){
+        if (STATUS_AUTOFILL_KEYS.indexOf(f.key) !== -1 || f.key === 'lokasi' || f.key === 'namaOperator') return;
+        html += '<div class="form-field ff-manual"><label>' + escapeHtml(f.label) + '</label>';
+        if (f.type === 'select'){
+          html += searchableFieldHtml('sf-' + f.key, f.options, '');
+        } else {
+          html += '<input type="text" id="sf-' + f.key + '" value="">';
+        }
+        html += '</div>';
+      });
+      html += '</div><p class="sub" style="margin-top:10px;">Semua 12 tahapan akan otomatis diset ke "Belum". Setelah project ditambahkan, klik "Update" pada baris tersebut untuk mulai mengisi status &amp; tanggal tahapannya.</p>';
+      html += '<div class="form-actions"><button class="btn" id="crudCancelBtn">Batal</button><button class="btn btn-accent" id="crudSaveBtn">Simpan</button></div>';
+      body.innerHTML = html;
+      document.getElementById('crudCancelBtn').addEventListener('click', closeCrudModal);
+      document.getElementById('crudSaveBtn').addEventListener('click', saveNewStatus);
+
+      function fillMetaFor(lokasiVal){
+        var entry = LOKASI_OPERATOR_OPTIONS.filter(function(o){ return o.lokasi === lokasiVal; })[0];
+        if (!entry) return;
+        var opList = document.getElementById('stf-operator-list');
+        opList.innerHTML = entry.operators.map(function(op){ return '<option value="' + escapeHtml(op) + '">'; }).join('');
+        document.getElementById('stf-operator').value = entry.operators[0] || '';
+        STATUS_AUTOFILL_KEYS.forEach(function(key){
+          var el = document.getElementById('sf-' + key);
+          if (el) el.value = (key === 'idProject' || key === 'kategoriProgram' || key === 'namaProgram' || key === 'namaInstansi' || key === 'namaVendor' || key === 'waktuRelokasi' || key === 'wilayah') ? (entry[key] || '') : (entry.statusRelokasi || '');
+        });
+      }
+      document.getElementById('stf-lokasi').addEventListener('input', function(){
+        var typed = this.value.trim();
+        var match = LOKASI_OPERATOR_OPTIONS.filter(function(o){ return o.lokasi === typed; })[0];
+        if (match) fillMetaFor(typed);
+      });
+      fillMetaFor(LOKASI_OPERATOR_OPTIONS[0].lokasi);
+    }).withFailureHandler(function(err){
+      body.innerHTML = '<div class="form-error" style="display:block;">Gagal memuat pilihan lokasi: ' + escapeHtml((err && err.message) || String(err)) + '</div>';
+    }).getLokasiOperatorOptionsForStatus(CURRENT_USER);
+  }
+
+  function saveNewStatus(){
+    var meta = { lokasi: document.getElementById('stf-lokasi').value, namaOperator: document.getElementById('stf-operator').value };
+    STATUS_FIELDS_CONFIG.meta.forEach(function(f){
+      if (f.key === 'lokasi' || f.key === 'namaOperator') return;
+      var el = document.getElementById('sf-' + f.key);
+      if (el) meta[f.key] = el.value;
+    });
+    var btn = document.getElementById('crudSaveBtn');
+    btn.disabled = true; btn.textContent = 'Menyimpan...';
+    google.script.run.withSuccessHandler(function(){ closeCrudModal(); loadStatusTabDataOnly(); }).withFailureHandler(function(err){
+      btn.disabled = false; btn.textContent = 'Simpan';
+      var el = document.getElementById('crudFormError');
+      el.textContent = (err && err.message) ? err.message : String(err);
+      el.style.display = 'block';
+    }).addStatusRelokasi(CURRENT_USER, { meta: meta });
+  }
+
+  /** Form "Update" - edit project yang sudah ada: status + tanggal 12 tahapan */
+  function openStatusForm(rowNum){
+    STATUS_EDIT_ROW = rowNum;
+    var rec = STATUS_ROWS.filter(function(r){ return r._row === rowNum; })[0];
+    document.getElementById('crudModalTitle').textContent = 'Update Status Relokasi';
+    document.getElementById('crudModalSub').textContent = 'Baris data #' + rowNum + ' - ' + escapeHtml(rec.lokasi) + ' (' + escapeHtml(rec.namaOperator) + ')';
+    var lockVendor = CURRENT_USER.kategori === 'Vendor';
+    var lockOperator = CURRENT_USER.kategori === 'Operator';
+    var html = '<div class="form-error" id="crudFormError"></div><div class="form-grid">';
+    var PIC_KEYS = ['picMitraTeknis','picMitraAdmin','picOperatorTeknis','picOperatorAdmin'];
+    STATUS_FIELDS_CONFIG.meta.forEach(function(f){
+      var val = rec[f.key] !== undefined ? rec[f.key] : '';
+      var locked = (f.key === 'namaVendor' && lockVendor) || (f.key === 'namaOperator' && lockOperator);
+      var manualClass = PIC_KEYS.indexOf(f.key) !== -1 ? ' ff-manual' : '';
+      html += '<div class="form-field' + manualClass + '"><label>' + escapeHtml(f.label) + (f.required ? ' *' : '') + '</label>';
+      if (f.type === 'select'){
+        html += searchableFieldHtml('sf-' + f.key, f.options, val, locked ? ' disabled' : '');
+      } else {
+        html += '<input type="text" id="sf-' + f.key + '" value="' + escapeHtml(val) + '"' + (locked ? ' disabled' : '') + '>';
+      }
+      html += '</div>';
+    });
+    html += '</div>';
+
+    function renderStepGroup(title, categoryName){
+      var stepsInGroup = STATUS_FIELDS_CONFIG.steps.filter(function(s){ return STATUS_FIELDS_CONFIG.stepCategory[s] === categoryName; });
+      var out = '<div class="section-title" style="margin:20px 0 6px;font-size:13px;">' + escapeHtml(title) + '</div><div class="steps-grid">';
+      stepsInGroup.forEach(function(step){
+        var val = rec['step_' + step];
+        var dateLabels = STATUS_FIELDS_CONFIG.dateColumns[step] || ['Tunggal'];
+        out += '<div class="form-field ff-manual"><label>' + escapeHtml(step) + '</label>' +
+          searchableFieldHtml('ss-' + step, ['Belum', 'Proses', 'Done'], val);
+        dateLabels.forEach(function(lbl, i){
+          var dval = rec['date_' + step + '_' + i] || '';
+          var dateLabel = (lbl === 'Tunggal') ? ('Tanggal ' + step) : ('Tanggal ' + lbl + ' ' + step);
+          out += '<label style="margin-top:4px;">' + escapeHtml(dateLabel) + '</label>' +
+            '<input type="date" id="sd-' + step + '-' + i + '" value="' + escapeHtml(dval) + '">';
+        });
+        out += '</div>';
+      });
+      return out + '</div>';
+    }
+    html += renderStepGroup('Baris 1 - Tahapan Teknis', 'Teknis');
+    html += renderStepGroup('Baris 2 - Tahapan Administrasi', 'Administrasi');
+    html += '<div class="form-actions"><button class="btn" id="crudCancelBtn">Batal</button><button class="btn btn-accent" id="crudSaveBtn">Simpan</button></div>';
+    document.getElementById('crudModalBody').innerHTML = html;
+    document.getElementById('crudCancelBtn').addEventListener('click', closeCrudModal);
+    document.getElementById('crudSaveBtn').addEventListener('click', saveStatus);
+    document.getElementById('crudModal').style.display = 'flex';
+  }
+
+  function saveStatus(){
+    var meta = {};
+    STATUS_FIELDS_CONFIG.meta.forEach(function(f){
+      var el = document.getElementById('sf-' + f.key);
+      if (el) meta[f.key] = el.value;
+    });
+    var steps = {}, dates = {};
+    STATUS_FIELDS_CONFIG.steps.forEach(function(step){
+      var el = document.getElementById('ss-' + step);
+      if (el) steps[step] = el.value;
+      var dateLabels = STATUS_FIELDS_CONFIG.dateColumns[step] || ['Tunggal'];
+      var vals = dateLabels.map(function(lbl, i){
+        var dEl = document.getElementById('sd-' + step + '-' + i);
+        return dEl ? dEl.value : '';
+      });
+      if (vals.some(function(v){ return v; })) dates[step] = (vals.length === 1) ? vals[0] : vals;
+    });
+    var btn = document.getElementById('crudSaveBtn');
+    btn.disabled = true; btn.textContent = 'Menyimpan...';
+    var onOk = function(){ closeCrudModal(); loadStatusTabDataOnly(); };
+    var onErr = function(err){
+      btn.disabled = false; btn.textContent = 'Simpan';
+      var el = document.getElementById('crudFormError');
+      el.textContent = (err && err.message) ? err.message : String(err);
+      el.style.display = 'block';
+    };
+    google.script.run.withSuccessHandler(onOk).withFailureHandler(onErr).updateStatusRelokasi(CURRENT_USER, STATUS_EDIT_ROW, { meta: meta, steps: steps, dates: dates });
+  }
+
+  function deleteStatusRow(rowNum){
+    if (!confirm('Hapus project relokasi ini beserta seluruh data 12 tahapannya? Tindakan ini tidak bisa dibatalkan.')) return;
+    google.script.run.withSuccessHandler(function(){ loadStatusTabDataOnly(); }).withFailureHandler(function(err){
+      alert('Gagal menghapus: ' + ((err && err.message) || String(err)));
+    }).deleteStatusRelokasi(CURRENT_USER, rowNum);
+  }
+
+  /* ---------------------- TAB: DATA RELOKASI & PETA (Admin/Vendor/Operator, filter sesuai peran) ---------------------- */
+
+  var RELOKASI_STATUS_COLORS = {};
+  var RELOKASI_PALETTE = ['#34D399', '#FBBF24', '#38BDF8', '#A78BFA', '#F87171', '#F472B6', '#94A3B8'];
+  function colorForStatus(status){
+    var key = String(status || 'Unknown').trim() || 'Unknown';
+    if (!RELOKASI_STATUS_COLORS[key]) {
+      var used = Object.keys(RELOKASI_STATUS_COLORS).length;
+      RELOKASI_STATUS_COLORS[key] = RELOKASI_PALETTE[used % RELOKASI_PALETTE.length];
+    }
+    return RELOKASI_STATUS_COLORS[key];
+  }
+
+  function loadRelokasiTab(){
+    RELOKASI_LOADED = true;
+    document.getElementById('relokasi-tbody').innerHTML = '<tr><td class="crud-empty" colspan="7">Memuat data...</td></tr>';
+    if (CURRENT_USER.kategori === 'Vendor') {
+      document.getElementById('relokasi-scope-note').textContent = 'Hanya menampilkan lokasi yang dikerjakan oleh vendor Anda.';
+    } else if (CURRENT_USER.kategori === 'Operator') {
+      document.getElementById('relokasi-scope-note').textContent = 'Menampilkan seluruh lokasi. Kolom "Nama Operator" hanya menunjukkan nama Anda sendiri (demi kerahasiaan operator lain).';
+    } else {
+      document.getElementById('relokasi-scope-note').textContent = 'Seluruh master data dari sheet "Data Relokasi", tanpa batasan.';
+    }
+    google.script.run.withSuccessHandler(function(rows){
+      RELOKASI_ROWS = rows || [];
+      renderRelokasiTable();
+    }).withFailureHandler(function(err){
+      document.getElementById('relokasi-tbody').innerHTML =
+        '<tr><td class="crud-empty" colspan="7">Gagal memuat: ' + escapeHtml((err && err.message) || String(err)) + '</td></tr>';
+    }).getDataRelokasiList(CURRENT_USER);
+  }
+
+  function renderRelokasiTable(){
+    var q = (document.getElementById('relokasi-search').value || '').trim().toLowerCase();
+    var filtered = RELOKASI_ROWS.filter(function(r){
+      if (!q) return true;
+      return [r.idProject, r.lokasi, r.namaVendor, r.wilayah].some(function(v){
+        return String(v || '').toLowerCase().indexOf(q) !== -1;
+      });
+    });
+    document.getElementById('relokasi-count').textContent = filtered.length + ' lokasi' + (q ? ' (dari total ' + RELOKASI_ROWS.length + ')' : '');
+    var tbody = document.getElementById('relokasi-tbody');
+    if (!filtered.length){
+      tbody.innerHTML = '<tr><td class="crud-empty" colspan="7">Tidak ada data.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = filtered.map(function(r){
+      return '<tr>' +
+        '<td>' + escapeHtml(r.idProject) + '</td>' +
+        '<td>' + escapeHtml(r.lokasi) + '</td>' +
+        '<td>' + escapeHtml(r.namaVendor) + '</td>' +
+        '<td>' + escapeHtml(r.wilayah) + '</td>' +
+        '<td>' + escapeHtml(r.status) + '</td>' +
+        '<td>' + r.operatorCount + '</td>' +
+        '<td>' + (r.operatorNames.length ? escapeHtml(r.operatorNames.join(', ')) : '<span class="sub">Belum ada</span>') + '</td>' +
+      '</tr>';
+    }).join('');
+  }
+  document.getElementById('relokasi-search').addEventListener('input', renderRelokasiTable);
+
+  function loadPetaTab(){
+    PETA_LOADED = true;
+    document.getElementById('relokasi-map-note').textContent = 'Memuat peta (bisa butuh beberapa saat kalau jumlah lokasi banyak)...';
+    google.script.run.withSuccessHandler(renderRelokasiMap).withFailureHandler(function(err){
+      document.getElementById('relokasi-map-note').textContent = 'Gagal memuat peta: ' + ((err && err.message) || String(err));
+    }).getRelokasiMapPoints(CURRENT_USER);
+  }
+
+  function renderRelokasiMap(result){
+    var points = result.points || [];
+    var note = points.length + ' lokasi tampil di peta dari total ' + result.totalLokasi + ' lokasi';
+    note += ' (titik yang alamatnya tidak berhasil dicocokkan dengan wajar otomatis disembunyikan)';
+    if (result.truncated) note += ' - dibatasi ' + points.length + ' titik pertama supaya tidak lambat';
+    document.getElementById('relokasi-map-note').textContent = note;
+
+    if (!RELOKASI_MAP_OBJ) {
+      RELOKASI_MAP_OBJ = L.map('relokasi-map', { scrollWheelZoom: false }).setView([-6.2, 106.85], 10);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors', maxZoom: 18
+      }).addTo(RELOKASI_MAP_OBJ);
+    } else {
+      RELOKASI_MAP_OBJ.eachLayer(function(layer){ if (layer instanceof L.CircleMarker || layer instanceof L.Marker || layer instanceof L.Polyline) RELOKASI_MAP_OBJ.removeLayer(layer); });
+    }
+
+    function labelIcon(letter, color){
+      return L.divIcon({
+        className: 'relokasi-pin',
+        html: '<div style="width:20px;height:20px;border-radius:50%;background:' + color + ';border:2px solid #fff;' +
+              'display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#0A0F1C;box-shadow:0 1px 4px rgba(0,0,0,.4);">' + letter + '</div>',
+        iconSize: [20, 20], iconAnchor: [10, 10]
+      });
+    }
+
+    var bounds = [];
+    points.forEach(function(p){
+      var color = colorForStatus(p.status);
+      if (p.start && p.end) {
+        L.polyline([[p.start.lat, p.start.lng], [p.end.lat, p.end.lng]], { color: color, weight: 2, opacity: 0.6, dashArray: '4,4' }).addTo(RELOKASI_MAP_OBJ);
+      }
+      [['S', 'Start Relokasi', p.start, p.startText], ['E', 'End Relokasi', p.end, p.endText]].forEach(function(pair){
+        var letter = pair[0], label = pair[1], pt = pair[2], addrText = pair[3];
+        if (!pt) return;
+        L.marker([pt.lat, pt.lng], { icon: labelIcon(letter, color) })
+          .bindPopup('<b>' + escapeHtml(p.lokasi) + '</b><br>' + label + ': ' + escapeHtml(addrText || '-') + '<br>Status: ' + escapeHtml(p.status))
+          .addTo(RELOKASI_MAP_OBJ);
+        bounds.push([pt.lat, pt.lng]);
+      });
+    });
+    if (bounds.length) RELOKASI_MAP_OBJ.fitBounds(bounds, { padding: [24, 24] });
+    setTimeout(function(){ RELOKASI_MAP_OBJ.invalidateSize(); }, 60);
+
+    var legend = document.getElementById('relokasi-map-legend');
+    legend.innerHTML = '<span style="display:flex;align-items:center;gap:6px;"><b>S</b> = Start Relokasi &nbsp; <b>E</b> = End Relokasi</span>' +
+      Object.keys(RELOKASI_STATUS_COLORS).map(function(status){
+        return '<span style="display:flex;align-items:center;gap:6px;"><span style="width:11px;height:11px;border-radius:50%;background:' +
+          RELOKASI_STATUS_COLORS[status] + ';display:inline-block;"></span>' + escapeHtml(status) + '</span>';
+      }).join('');
+  }
+</script>
+</body>
+</html>
